@@ -85,6 +85,18 @@ struct PlayerData: public ShapeBaseData {
                                                                   ///  Depends on the ShapeBaseData computeCRC field.
    bool              mValidShapeFP[ShapeBase::MaxMountedImages];  ///< Indicates that there is a valid first person mounted image shape
 
+   F32 sHealth = 100.0f;
+   F32 sMaxHealth = 100.0f;
+
+   F32 sPower = 100.0f;
+   F32 sMaxPower = 100.0f;
+
+   F32 sEnergy = 100.0f;
+   F32 sMaxEnergy = 100.0f;
+
+   F32 sBattery = 100.0f;
+   F32 sMaxBattery = 100.0f;
+
    F32 pickupRadius;          ///< Radius around player for items (on server)
    F32 maxTimeScale;          ///< Max timeScale for action animations
 
@@ -593,6 +605,14 @@ protected:
    void setPose( Pose pose );
 
    PhysicsPlayer* getPhysicsRep() const { return mPhysicsRep; }
+
+   F32 getHealth();
+   F32 getMaxHealth();
+   F32 getEnergy();
+   F32 getMaxEnergy();
+   //F32 getPower();
+   void setEnergy(F32 value);
+   void setHealth(F32 value);
 
 #ifdef TORQUE_OPENVR
    void setControllers(Vector<OpenVRTrackedObject*> controllerList);

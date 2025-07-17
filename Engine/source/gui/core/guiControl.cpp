@@ -2963,3 +2963,70 @@ DefineEngineMethod(GuiControl, execAltCommand, const char*, (), ,
 {
    return object->execAltConsoleCallback();
 }
+
+// Draw a line (no thickness param, since Torque3D doesn't support it directly)
+void GuiControl::drawLine(Point2I start, Point2I end, ColorI color)
+{
+   GFX->getDrawUtil()->drawLine(start, end, color);
+}
+
+// Fill a rectangle
+void GuiControl::drawRectFill(Point2I pos, Point2I extent, ColorI color)
+{
+   RectI rect(pos, extent);
+   GFX->getDrawUtil()->drawRectFill(rect, color);
+}
+
+// Draw text
+void GuiControl::drawText(Point2I pos, const char* text, GFont* font, ColorI color)
+{
+   if (!font)
+      return;
+
+   GFX->getDrawUtil()->setBitmapModulation(color);
+   GFX->getDrawUtil()->drawText(font, pos, text);
+   GFX->getDrawUtil()->clearBitmapModulation();
+}
+
+DefineEngineMethod(GuiControl, drawLine, void,
+   (S32 x1, S32 y1, S32 x2, S32 y2, const char* colorStr),
+   ,
+   "(int x1, int y1, int x2, int y2, \"R G B A\")\n"
+   "Draw a line on the GUI control.")
+{
+   ColorI color;
+   dSscanf(colorStr, "%d %d %d %d", &color.red, &color.green, &color.blue, &color.alpha);
+   object->drawLine(Point2I(x1, y1), Point2I(x2, y2), color);
+}
+
+DefineEngineMethod(GuiControl, drawRectFill, void,
+   (S32 x, S32 y, S32 width, S32 height, const char* colorStr),
+   ,
+   "(int x, int y, int width, int height, \"R G B A\")\n"
+   "Fill a rectangle on the GUI control.")
+{
+   ColorI color;
+   dSscanf(colorStr, "%d %d %d %d", &color.red, &color.green, &color.blue, &color.alpha);
+   object->drawRectFill(Point2I(x, y), Point2I(width, height), color);
+}
+
+DefineEngineMethod(GuiControl, drawText, void,
+   (S32 x, S32 y, const char* text, const char* fontName, const char* colorStr),
+   ,
+   "(int x, int y, string text, string fontName, \"R G B A\")\n"
+   "Draw text on the GUI control.")
+{
+   ColorI color;
+   dSscanf(colorStr, "%d %d %d %d", &color.red, &color.green, &color.blue, &color.alpha);
+
+   // Create font using Torque3D's actual method
+   Resource<GFont> font = GFont::create(fontName, 14, NULL); // size=14, default cache dir
+   if (!bool(font))
+   {
+      GuiControlProfile* profile = object->getControlProfile(); // SAFE access
+      if (profile && profile->mFont)
+         font = Resource<GFont>(profile->mFont); // ✅ Wrap raw pointer in Resource<>
+   }
+
+   object->drawText(Point2I(x, y), text, font, color);
+}

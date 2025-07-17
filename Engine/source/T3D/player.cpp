@@ -72,6 +72,18 @@
 #include "platform/input/openVR/openVRTrackedObject.h"
 #endif
 
+static F32 sHealth = 100.0f;
+static F32 sMaxHealth = 100.0f;
+
+static F32 sPower = 100.0f;
+static F32 sMaxPower = 100.0f;
+
+static F32 sEnergy = 100.0f;
+static F32 sMaxEnergy = 100.0f;
+
+static F32 sBattery = 100.0f;
+static F32 sMaxBattery = 100.0f;
+
 // Amount of time if takes to transition to a new action sequence.
 static F32 sAnimationTransitionTime = 0.25f;
 static bool sUseAnimationTransitions = true;
@@ -282,6 +294,18 @@ IMPLEMENT_CALLBACK( PlayerData, onLeaveMissionArea, void, ( Player* obj ), ( obj
 
 PlayerData::PlayerData()
 {
+   sHealth = 100.0f;
+   sMaxHealth = 100.0f;
+
+   sPower = 100.0f;
+   sMaxPower = 100.0f;
+
+   sEnergy = 100.0f;
+   sMaxEnergy = 100.0f;
+
+   sBattery = 100.0f;
+   sMaxBattery = 100.0f;
+
    shadowSize = 256;
    shadowProjectionDistance = 14.0f;
 
@@ -2188,6 +2212,9 @@ void Player::processTick(const Move* move)
 // PATHSHAPE
    if (!isGhost()) updateAttachment(); 
 // PATHSHAPE END
+
+   if (isMethod("processTick") && isServerObject())
+      Con::executef(this, "processTick");
 }
 
 void Player::interpolateTick(F32 dt)
@@ -2253,6 +2280,9 @@ void Player::advanceTime(F32 dt)
          gCamFXMgr.clear();
       }
    }
+
+   if (isMethod("interpolateTick"))
+      Con::executef(this, "interpolateTick", Con::getFloatArg(dt));
 }
 
 bool Player::getAIMove(Move* move)
@@ -7640,6 +7670,86 @@ void Player::restoreMovement(U32 tag)
       speed_bias_goal = 1.0;
       override_movement = false;
    }
+}
+
+F32 Player::getHealth()
+{
+   return sHealth;
+}
+
+F32 Player::getMaxHealth()
+{
+   return sMaxHealth;
+}
+
+F32 Player::getEnergy()
+{
+   return sEnergy;
+}
+
+F32 Player::getMaxEnergy()
+{
+   return sMaxEnergy;
+}
+
+void Player::setHealth(F32 value)
+{
+   sHealth = value;
+}
+
+void Player::setEnergy(F32 value)
+{
+   sEnergy = value;
+}
+
+//----------------------------------------------------------------------------
+DefineEngineMethod(Player, getHealth, F32, (), ,
+   "@brief Get the health of the player.\n\n"
+
+   "@return The current health;")
+{
+   return object->getHealth();
+}
+
+//----------------------------------------------------------------------------
+DefineEngineMethod(Player, getMaxHealth, F32, (), ,
+   "@brief Get the max health of the player.\n\n"
+
+   "@return The max health;")
+{
+   return object->getMaxHealth();
+}
+
+//----------------------------------------------------------------------------
+DefineEngineMethod(Player, setHealth, void, (F32 value), ,
+   "@brief Set the health of the player.\n\n")
+{
+   object->setHealth(value);
+}
+
+//----------------------------------------------------------------------------
+DefineEngineMethod(Player, setEnergy, void, (F32 value), ,
+   "@brief Set the energy of the player.\n\n")
+{
+   object->setEnergy(value);
+}
+
+//----------------------------------------------------------------------------
+DefineEngineMethod(Player, getEnergy, F32, (), ,
+   "@brief Get the energy of the player.\n\n"
+
+   "@return The current energy;")
+{
+   return object->getEnergy();
+}
+
+//----------------------------------------------------------------------------
+DefineEngineMethod(Player, getMaxEnergy, F32, (), ,
+   "@brief Get the max energy of the player.\n\n"
+
+   "@return The max energy;")
+{
+   return object->getMaxEnergy();
 }
 
 DefineEngineMethod(Player, setMovementSpeedBias, void, (F32 bias),, "setMovementSpeedBias(F32 bias)")

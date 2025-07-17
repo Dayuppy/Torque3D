@@ -165,6 +165,8 @@ public:
    /// If colors is NULL the default colors are RED, GREEEN, BLUE ( x, y, z ).
    void drawTransform( const GFXStateBlockDesc &desc, const MatrixF &mat, const Point3F *scale = NULL, const ColorI colors[3] = NULL );
 
+   void drawTextShadowed(GFont* font, const Point2I& pos, const char* text, const ColorI& color, const ColorI& shadowColor);
+
 protected:
 
    void _setupStateBlocks();

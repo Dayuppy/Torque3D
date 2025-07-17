@@ -144,6 +144,12 @@ class GuiControl : public SimGroup
          vertResizeAspectCenter,  ///< resize relative to width delta Centered)
          vertResizeWindowRelative ///< resize window relative
       };
+
+      void drawLine(Point2I start, Point2I end, ColorI color);
+
+      void drawRectFill(Point2I pos, Point2I extent, ColorI color);
+
+      void drawText(Point2I pos, const char* text, GFont* font, ColorI color);
       
    private:
    

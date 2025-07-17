@@ -1850,3 +1850,24 @@ void GFXDrawUtil::drawTransform( const GFXStateBlockDesc &desc, const MatrixF &m
    mDevice->setupGenericShaders();
    mDevice->drawPrimitive( GFXLineList, 0, 3 );
 }
+
+void GFXDrawUtil::drawTextShadowed(GFont* font, const Point2I& pos, const char* text, const ColorI& color, const ColorI& shadowColor)
+{
+   if (!font || !text || !text[0])
+      return;
+
+   // Save current modulation color
+   ColorI prevColor;
+   getBitmapModulation(&prevColor);
+
+   // Draw shadow
+   setBitmapModulation(shadowColor);
+   drawText(font, pos + Point2I(1, 1), text);
+
+   // Draw main text
+   setBitmapModulation(color);
+   drawText(font, pos, text);
+
+   // Restore previous color
+   setBitmapModulation(prevColor);
+}
