@@ -112,6 +112,11 @@ private:
    bool  mAddPitchToAbsRot;      ///< Add relative pitch control to the absolute rotation calculation.  Only useful with mAbsoluteRotation.
    /// @}
 
+protected:
+   bool mIsAdmin;
+   bool mIsSuperAdmin;
+   bool mIsServerOwner;
+
 public:
 
    /// @name Protocol Versions
@@ -170,6 +175,11 @@ public:
 
    void setVisibleGhostDistance(F32 dist);
    F32 getVisibleGhostDistance();
+
+   /// Script-visible properties:
+   bool getAdmin()        const { return mIsAdmin; }
+   bool getSuperAdmin()   const { return mIsSuperAdmin; }
+   bool getServerOwner()  const { return mIsServerOwner; }
 
 private:
    /// @name Connection State

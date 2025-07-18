@@ -33,12 +33,6 @@ public:
    ColorI mDegreeColor;
    ColorI mNorthColor;
 
-   // Radial Compass
-   Point2F mRadialCenterOffset;
-   F32     mRadialRadius;
-   F32     mRadialTickLength;
-   F32     mRadialTextDistance;
-
    // State
    F32 mPrevYaw;
 };

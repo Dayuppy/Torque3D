@@ -91,7 +91,9 @@ LevelInfo::LevelInfo()
       mSoundAmbience( NULL ),
       mSoundDistanceModel( SFXDistanceModelLinear ),
       mSoundscape( NULL ),
-      mDampness(0.0)
+      mDampness(0.0),
+      mMinKillZ(-1000.0f),
+      mMaxKillZ(1000.0f)
 {
    mFogData.density = 0.0f;
    mFogData.densityOffset = 0.0f;
@@ -184,6 +186,13 @@ void LevelInfo::initPersistFields()
       addField( "soundDistanceModel", TypeSFXDistanceModel, Offset( mSoundDistanceModel, LevelInfo ), "The distance attenuation model to use." );
    
    endGroup( "Sound" );
+
+   addGroup("Gameplay");
+      addField("minKillZ", TypeF32, Offset(mMinKillZ, LevelInfo),
+         "@brief Players below this Z are killed.");
+      addField("maxKillZ", TypeF32, Offset(mMaxKillZ, LevelInfo),
+         "@brief Players above this Z are killed.");
+   endGroup("Gameplay");
    
    Parent::initPersistFields();
 }
@@ -225,6 +234,9 @@ U32 LevelInfo::packUpdate(NetConnection *conn, U32 mask, BitStream *stream)
    stream->writeInt( mSoundDistanceModel, 1 );
 
    PACK_ASSET(conn, AccuTexture);
+
+   stream->write(mMinKillZ);
+   stream->write(mMaxKillZ);
 
    return retMask;
 }
@@ -275,6 +287,9 @@ void LevelInfo::unpackUpdate(NetConnection *conn, BitStream *stream)
 
    UNPACK_ASSET(conn, AccuTexture);
    setLevelAccuTexture(getAccuTexture());
+
+   stream->read(&mMinKillZ);
+   stream->read(&mMaxKillZ);
 }
 
 //-----------------------------------------------------------------------------

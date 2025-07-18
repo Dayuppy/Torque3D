@@ -23,11 +23,6 @@ GuiCompassControl::GuiCompassControl()
    mNeedleColor.set(255, 0, 0, 255);
    mDegreeColor.set(255, 0, 0, 255);
    mNorthColor.set(255, 255, 0, 255);
-
-   mRadialCenterOffset.set(-64, 64);
-   mRadialRadius = 40.f;
-   mRadialTickLength = 8.f;
-   mRadialTextDistance = 12.f;
 }
 
 void GuiCompassControl::initPersistFields()
@@ -44,10 +39,6 @@ void GuiCompassControl::initPersistFields()
    addField("needleColor", TypeColorI, Offset(mNeedleColor, GuiCompassControl));
    addField("degreeColor", TypeColorI, Offset(mDegreeColor, GuiCompassControl));
    addField("northColor", TypeColorI, Offset(mNorthColor, GuiCompassControl));
-   addField("radialCenterOffset", TypePoint2F, Offset(mRadialCenterOffset, GuiCompassControl));
-   addField("radialRadius", TypeF32, Offset(mRadialRadius, GuiCompassControl));
-   addField("radialTickLength", TypeF32, Offset(mRadialTickLength, GuiCompassControl));
-   addField("radialTextDistance", TypeF32, Offset(mRadialTextDistance, GuiCompassControl));
 }
 
 void GuiCompassControl::onRender(Point2I offset, const RectI& updateRect)
@@ -126,42 +117,4 @@ void GuiCompassControl::onRender(Point2I offset, const RectI& updateRect)
          drawer->drawTextShadowed(font, Point2I(xText, (S32)y), label, col, ColorI(0, 0, 0, 255));
       }
    }
-
-   // === RADIAL COMPASS ===
-   Point2I center = Point2I(extent.x, 0) + Point2I((S32)mRadialCenterOffset.x, (S32)mRadialCenterOffset.y);
-   S32 numSegments = 64;
-
-   for (S32 i = 0; i < numSegments; ++i)
-   {
-      F32 a0 = M_PI_F * 2 * (i / (F32)numSegments);
-      F32 a1 = M_PI_F * 2 * ((i + 1) / (F32)numSegments);
-      Point2I p0((S32)(center.x + mCos(a0) * mRadialRadius), (S32)(center.y + mSin(a0) * mRadialRadius));
-      Point2I p1((S32)(center.x + mCos(a1) * mRadialRadius), (S32)(center.y + mSin(a1) * mRadialRadius));
-      drawer->drawLine(p0, p1, mHashmarkColor);
-   }
-
-   for (S32 a = 0; a < 360; a += 45)
-   {
-      F32 angle = mDegToRad(mFmod((a - smoothedYaw - 90 + 360), 360));
-      F32 cosA = mCos(angle), sinA = mSin(angle);
-
-      Point2I inner((S32)(center.x + cosA * (mRadialRadius - mRadialTickLength)), (S32)(center.y + sinA * (mRadialRadius - mRadialTickLength)));
-      Point2I outer((S32)(center.x + cosA * mRadialRadius), (S32)(center.y + sinA * mRadialRadius));
-      drawer->drawLine(inner, outer, (a == 0) ? mNorthColor : mHashmarkColor);
-
-      const char* lbl = "";
-      switch (a)
-      {
-      case 0: lbl = "N"; break; case 45: lbl = "NE"; break; case 90: lbl = "E"; break;
-      case 135: lbl = "SE"; break; case 180: lbl = "S"; break; case 225: lbl = "SW"; break;
-      case 270: lbl = "W"; break; case 315: lbl = "NW"; break;
-      }
-
-      Point2I labelPos((S32)(center.x + cosA * (mRadialRadius + mRadialTextDistance) - 6),
-         (S32)(center.y + sinA * (mRadialRadius + mRadialTextDistance) - 6));
-      drawer->drawTextShadowed(font, labelPos, lbl, (a == 0) ? mNorthColor : mHashmarkColor, ColorI(0, 0, 0, 255));
-   }
-
-   drawer->drawLine(center + Point2I(0, -20), center + Point2I(0, -10), mNeedleColor);
-   drawer->drawTextShadowed(font, center + Point2I(-12, 20), degBuf, mDegreeColor, ColorI(0, 0, 0, 255));
 }

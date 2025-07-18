@@ -111,6 +111,9 @@ class LevelInfo : public NetObject
 
       void onAccuTextureChanged() {}
 
+      F32 mMinKillZ;
+      F32 mMaxKillZ;
+
    public:
 
       LevelInfo();
@@ -149,6 +152,11 @@ class LevelInfo : public NetObject
       static bool _setLevelAccuTexture(void *object, const char *index, const char *data);
       void setLevelAccuTexture(StringTableEntry name);
       /// @}
+
+      /// Die if you go below this Z
+      F32 getMinKillZ() const { return mMinKillZ; }
+      /// Die if you go above this Z
+      F32 getMaxKillZ() const { return mMaxKillZ; }
 };
 
 #endif // _LEVELINFO_H_

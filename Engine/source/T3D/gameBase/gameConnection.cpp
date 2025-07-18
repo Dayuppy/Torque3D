@@ -187,7 +187,10 @@ bool GameConnection::server_cache_on = false;
 bool GameConnection::client_cache_on = false;
 #endif 
 //----------------------------------------------------------------------------
-GameConnection::GameConnection()
+GameConnection::GameConnection() :
+   mIsAdmin(false),
+   mIsSuperAdmin(false),
+   mIsServerOwner(false)
 {
 #ifdef TORQUE_AFX_ENABLED
    mRolloverObj = NULL;
@@ -2931,4 +2934,4 @@ bool GameConnection::loadDatablockCache_Continue()
    return true;
 }
 
-#endif 
+#endif

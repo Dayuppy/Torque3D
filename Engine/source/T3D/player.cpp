@@ -63,6 +63,8 @@
 #include "math/mathUtils.h"
 #include "gfx/sim/debugDraw.h"
 
+#include "T3D/levelInfo.h"
+
 #ifdef TORQUE_EXTENDED_MOVE
    #include "T3D/gameBase/extended/extendedMove.h"
 #endif
@@ -2086,6 +2088,19 @@ void Player::processTick(const Move* move)
    // clients.
    if (isServerObject())
    {
+
+      // Fetch the level’s kill-planes
+      LevelInfo* lvl = dynamic_cast<LevelInfo*>(Sim::findObject("theLevelInfo"));
+      if (lvl)
+      {
+         const Point3F& pos = getPosition();
+         if (pos.z < lvl->getMinKillZ() || pos.z > lvl->getMaxKillZ())
+         {
+            // instant‐kill
+            this->applyDamage(9001.0f);
+         }
+      }
+
       fx_s_triggers = 0;
       if (move)
       {
