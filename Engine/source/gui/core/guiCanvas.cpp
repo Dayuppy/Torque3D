@@ -2126,18 +2126,18 @@ void GuiCanvas::resetUpdateRegions()
    mCurUpdateRect = mOldUpdateRects[0];
 }
 
-void GuiCanvas::setFirstResponder( GuiControl* newResponder )
+void GuiCanvas::setFirstResponder(GuiControl* newResponder)
 {
    GuiControl* oldResponder = mFirstResponder;
-   Parent::setFirstResponder( newResponder );
-   
-   if( oldResponder == mFirstResponder )
+   Parent::setFirstResponder(newResponder);
+
+   if (oldResponder == mFirstResponder)
       return;
 
-   if( oldResponder && ( oldResponder != newResponder ) )
+   if (oldResponder && (oldResponder != newResponder))
       oldResponder->onLoseFirstResponder();
-      
-   if( newResponder && ( newResponder != oldResponder ) )
+
+   if (newResponder && (newResponder != oldResponder) && newResponder->isProperlyAdded())
       newResponder->onGainFirstResponder();
 }
 

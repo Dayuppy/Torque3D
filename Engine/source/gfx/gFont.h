@@ -47,6 +47,8 @@ GFX_DeclareTextureProfile(GFXFontTextureProfile);
 class GFont
 {
 public:
+   bool writeToStream(Stream* stream) const;
+
    enum Constants 
    {
       TabWidthInSpaces = 3,
@@ -126,6 +128,8 @@ public:
 
    static GFont* load( const Torque::Path& path );
 
+   Torque::Path mGFTFile;
+
 protected:
    bool loadCharInfo(const UTF16 ch);
    void addBitmap(PlatformFont::CharInfo &charInfo);
@@ -145,7 +149,6 @@ private:
    S32 mCurSheet;
 
    bool mNeedSave;
-   Torque::Path mGFTFile;
    String mFaceName;
    U32 mSize;
    U32 mCharSet;

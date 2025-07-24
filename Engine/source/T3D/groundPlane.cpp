@@ -81,7 +81,7 @@ GroundPlane::GroundPlane()
      mMin( 0.0f, 0.0f ),
      mMax( 0.0f, 0.0f )
 {
-   mTypeMask |= StaticObjectType | StaticShapeObjectType;
+   mTypeMask |= TerrainObjectType | StaticObjectType; // | StaticShapeObjectType;
    mNetFlags.set( Ghostable | ScopeAlways );
 
    mConvexList = new Convex;

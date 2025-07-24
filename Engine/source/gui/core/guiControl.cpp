@@ -2230,12 +2230,12 @@ void GuiControl::setFirstResponder( GuiControl* firstResponder )
 
 void GuiControl::setFirstResponder()
 {
-	if( mAwake && mVisible )
-	{
-	   GuiControl *parent = getParent();
-	   if ( mProfile->mCanKeyFocus == true && parent != NULL )
-         parent->setFirstResponder( this );
-	}
+   if (mAwake && mVisible && isProperlyAdded())
+   {
+      GuiControl* parent = getParent();
+      if (mProfile->mCanKeyFocus == true && parent && parent->isProperlyAdded())
+         parent->setFirstResponder(this);
+   }
 }
 
 //-----------------------------------------------------------------------------

@@ -223,7 +223,10 @@ void ShaderConnectorHLSL::sortVars()
    // If shader model 4+ than we gotta sort the vars to make sure the order is consistent
    if (GFX->getPixelShaderVersion() >= 4.f)
    {
-      dQsort((void *)&mElementList[0], mElementList.size(), sizeof(Var *), _hlsl4VarSort);
+      if (mElementList.empty())
+         return; // Prevent out-of-bounds access
+
+      dQsort((void*)&mElementList[0], mElementList.size(), sizeof(Var*), _hlsl4VarSort);
       return;
    }
 

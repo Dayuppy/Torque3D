@@ -44,6 +44,10 @@ public:
       ButtonTypeRadio,
    };
 
+   bool mContainerOpaque;
+
+   virtual GuiControl* findHitControl(const Point2I& pt, S32 initialLayer) override;
+
 protected:
 
    StringTableEntry mButtonText;

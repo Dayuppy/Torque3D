@@ -1208,11 +1208,13 @@ bool ShapeBase::onNewDataBlock( GameBaseData *dptr, bool reload )
             }
          }
       }
-      mShapeInstance = new TSShapeInstance(mDataBlock->mShape, isClientObject());
+      //
+
+      mShapeInstance = new TSShapeInstance(mDataBlock->mShape, true);// mShapeInstance = new TSShapeInstance(mDataBlock->mShape, isClientObject());
+      mShapeInstance->cloneMaterialList(); // moved out of isCLientObject() check
+
       if (isClientObject())
       {
-         mShapeInstance->cloneMaterialList();
-
          // restore the material tags to original form
          if (mDataBlock->txr_tag_remappings.size() > 0)
          {

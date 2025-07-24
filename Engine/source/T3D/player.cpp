@@ -2228,7 +2228,7 @@ void Player::processTick(const Move* move)
    if (!isGhost()) updateAttachment(); 
 // PATHSHAPE END
 
-   if (isMethod("processTick") && isServerObject())
+   if (isServerObject() && isMethod("processTick"))
       Con::executef(this, "processTick");
 }
 

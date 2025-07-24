@@ -229,14 +229,14 @@ void GuiInspectorField::onRender( Point2I offset, const RectI &updateRect )
 
 //-----------------------------------------------------------------------------
 
-void GuiInspectorField::setFirstResponder( GuiControl *firstResponder )
+void GuiInspectorField::setFirstResponder(GuiControl* firstResponder)
 {
-   Parent::setFirstResponder( firstResponder );
+   Parent::setFirstResponder(firstResponder);
 
-   if ( firstResponder == this || firstResponder == mEdit )
+   if ((firstResponder == this || firstResponder == mEdit) && (firstResponder && firstResponder->isProperlyAdded()))
    {
-      mInspector->setHighlightField( this );      
-   }   
+      mInspector->setHighlightField(this);
+   }
 }
 
 //-----------------------------------------------------------------------------
@@ -917,19 +917,47 @@ void GuiInspectorField::_registerEditControl(GuiControl* ctrl, StringTableEntry 
 
 //-----------------------------------------------------------------------------
 
-void GuiInspectorField::_setFieldDocs( StringTableEntry docs )
+void GuiInspectorField::_setFieldDocs(StringTableEntry docs)
 {
    mFieldDocs = String();
-   if( docs && docs[ 0 ] )
+   if (docs && docs[0])
    {
       // Only accept first line of docs for brevity.
-      
-      const char* newline = dStrchr( docs, '\n' );
-      if( newline )
-         mFieldDocs = String( docs, newline - docs );
+
+      const char* newline = dStrchr(docs, '\n');
+      if (newline)
+         mFieldDocs = String(docs, newline - docs);
       else
          mFieldDocs = docs;
    }
+
+   String inDocs(docs);
+   String outDocs("");
+   String outLine("");
+   S32 newline = inDocs.find('\n');
+   if (newline == -1)
+      outDocs = docs;
+   else
+   {
+      U32 uCount = StringUnit::getUnitCount(inDocs, " ");
+      for (U32 i = 0; i < uCount; i++)
+      {
+         String docWord = StringUnit::getUnit(inDocs, i, " ");
+         if (!docWord.isEmpty())
+            outLine += docWord;
+
+         if (outLine.length() > 80)
+         {
+            outLine += "\n";
+            outDocs += outLine;
+            outLine.clear();
+         }
+         else
+            outLine += " ";
+      }
+   }
+   outDocs += String("\n") + outLine;
+   mTooltip = outDocs;
 }
 
 void GuiInspectorField::setHeightOverride(bool useOverride, U32 heightOverride)

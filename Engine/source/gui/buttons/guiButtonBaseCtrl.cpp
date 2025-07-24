@@ -113,6 +113,7 @@ GuiButtonBaseCtrl::GuiButtonBaseCtrl()
    mButtonType = ButtonTypePush;
    mUseMouseEvents = false;
    mMouseDragged = false;
+   mContainerOpaque = true;
 }
 
 //-----------------------------------------------------------------------------
@@ -138,10 +139,26 @@ void GuiButtonBaseCtrl::initPersistFields()
       "Button behavior type.\n");
    addField("useMouseEvents", TypeBool, Offset(mUseMouseEvents, GuiButtonBaseCtrl),
       "If true, mouse events will be passed on to script.  Default is false.\n");
+   addField("containerOpaque", TypeBool, Offset(mContainerOpaque, GuiButtonBaseCtrl),
+      "If true, this control will capture *all* mouse hits (children will not steal clicks).");
 
    endGroup("Button");
 
    Parent::initPersistFields();
+}
+
+//-----------------------------------------------------------------------------
+
+// Swallow children hits when mContainerOpaque == true
+GuiControl * GuiButtonBaseCtrl::findHitControl(const Point2I & pt, S32 initialLayer)
+{
+   // if we’re marked opaque and the point is inside us, return ourselves
+   RectI myRect(Point2I::Zero, getExtent());
+   if (mContainerOpaque && myRect.pointInRect(pt))
+      return this;
+
+   // otherwise fall back to the normal GUI hit-test (which finds the deepest child)
+   return Parent::findHitControl(pt, initialLayer);
 }
 
 //-----------------------------------------------------------------------------

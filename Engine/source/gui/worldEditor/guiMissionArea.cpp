@@ -29,6 +29,7 @@
 #include "gui/3d/guiTSControl.h"
 #include "T3D/gameFunctions.h"
 #include "terrain/terrData.h"
+#include "T3D/missionArea.h" 
 
 namespace {
    F32 round_local(F32 val)
@@ -568,6 +569,31 @@ Point2I GuiMissionAreaCtrl::convertOrigin(const Point2I &pos)
    return pt;
 }
 
+/// Build a screen‐space polygon from the mission area’s getPoly()
+void GuiMissionAreaCtrl::getScreenMissionPoly(Vector<Point2F>& outPoly)
+{
+   outPoly.clear();
+   if (!mMissionArea)
+      return;
+
+   const Vector<Point2I>& worldPoly = mMissionArea->getPoly();
+   outPoly.reserve(worldPoly.size());
+
+   for (U32 i = 0; i < worldPoly.size(); ++i)
+   {
+      // world‐space point
+      const Point2I& w = worldPoly[i];
+      // to float
+      Point2F wf((F32)w.x, (F32)w.y);
+      // and to screen
+      Point2F sp = worldToScreen(wf);
+      // Round to nearest pixel
+      sp.x = round_local(sp.x);
+      sp.y = round_local(sp.y);
+      outPoly.push_back(sp);
+   }
+}
+
 void GuiMissionAreaCtrl::onRender(Point2I offset, const RectI & updateRect)
 {
 
@@ -617,18 +643,34 @@ void GuiMissionAreaCtrl::onRender(Point2I offset, const RectI & updateRect)
       PrimBuild::vertex2f( rect.point.x + 5 + fillOffset, rect.point.y + rect.extent.y - 25 + fillOffset );
    PrimBuild::end();
 
-   RectF area;
-   getScreenMissionArea(area);
-
-   // render the mission area box
-   PrimBuild::color( mMissionBoundsColor );
-   PrimBuild::begin( GFXLineStrip, 5 );
+   // render the mission area polygon
+   Vector<Point2F> poly;
+   getScreenMissionPoly(poly);
+   if (poly.size() >= 3)
+   {
+      PrimBuild::color(mMissionBoundsColor);
+      // +1 to close the loop
+      PrimBuild::begin(GFXLineStrip, poly.size() + 1);
+      for (U32 i = 0; i < poly.size(); ++i)
+         PrimBuild::vertex2f(poly[i].x + fillOffset, poly[i].y + fillOffset);
+      // close it
+      PrimBuild::vertex2f(poly[0].x + fillOffset, poly[0].y + fillOffset);
+      PrimBuild::end();
+   }
+   else
+   {
+      // fallback to the old rectangle if you still want it
+      RectF area;
+      getScreenMissionArea(area);
+      PrimBuild::color(mMissionBoundsColor);
+      PrimBuild::begin(GFXLineStrip, 5);
       PrimBuild::vertex2f(area.point.x + fillOffset, area.point.y + fillOffset);
       PrimBuild::vertex2f(area.point.x + area.extent.x + fillOffset, area.point.y + fillOffset);
       PrimBuild::vertex2f(area.point.x + area.extent.x + fillOffset, area.point.y + area.extent.y + fillOffset);
       PrimBuild::vertex2f(area.point.x + fillOffset, area.point.y + area.extent.y + fillOffset);
       PrimBuild::vertex2f(area.point.x + fillOffset, area.point.y + fillOffset);
-   PrimBuild::end();
+      PrimBuild::end();
+   }
 
    // render the camera
    //if(mRenderCamera)
@@ -675,6 +717,62 @@ void GuiMissionAreaCtrl::onRender(Point2I offset, const RectI & updateRect)
    drawHandles(iArea);
 
    renderChildControls(offset, updateRect);
+   renderMissionPrism();
+}
+
+//------------------------------------------------------------------------------
+// Build and draw a wireframe prism from the MissionArea polygon
+//------------------------------------------------------------------------------
+
+void GuiMissionAreaCtrl::renderMissionPrism()
+{
+   if (!mMissionArea || !mTerrainBlock)
+      return;
+
+   const Vector<Point2I>& footprint = mMissionArea->getPoly();
+   if (footprint.size() < 3)
+      return;
+
+   Vector<Point3F> bottom, top;
+   bottom.reserve(footprint.size());
+   top.reserve(footprint.size());
+
+   F32 bottomZ = 0.0f;
+   F32 topZ = mMissionArea->getFlightCeiling();
+
+   // use push_back since Vector<T> in Torque doesn't have emplace_back()
+   for (U32 i = 0; i < footprint.size(); ++i)
+   {
+      const Point2I& p = footprint[i];
+      bottom.push_back(Point3F((F32)p.x, (F32)p.y, bottomZ));
+      top.push_back(Point3F((F32)p.x, (F32)p.y, topZ));
+   }
+
+   GFX->setStateBlock(mSolidStateBlock);
+   PrimBuild::color(mMissionBoundsColor);
+
+   // bottom ring
+   PrimBuild::begin(GFXLineStrip, bottom.size() + 1);
+   for (U32 i = 0; i < bottom.size(); ++i)
+      PrimBuild::vertex3fv(bottom[i]);
+   PrimBuild::vertex3fv(bottom[0]);
+   PrimBuild::end();
+
+   // top ring
+   PrimBuild::begin(GFXLineStrip, top.size() + 1);
+   for (U32 i = 0; i < top.size(); ++i)
+      PrimBuild::vertex3fv(top[i]);
+   PrimBuild::vertex3fv(top[0]);
+   PrimBuild::end();
+
+   // vertical edges
+   PrimBuild::begin(GFXLineList, bottom.size() * 2);
+   for (U32 i = 0; i < bottom.size(); ++i)
+   {
+      PrimBuild::vertex3fv(bottom[i]);
+      PrimBuild::vertex3fv(top[i]);
+   }
+   PrimBuild::end();
 }
 
 //------------------------------------------------------------------------------

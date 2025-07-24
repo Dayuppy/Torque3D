@@ -34,7 +34,8 @@
 #include "console/engineAPI.h"
 #include "platform/threads/mutex.h"
 #include "zlib/zlib.h"
-
+#include "gfx/bitmap/gBitmap.h"
+#include "core/stream/stream.h"
 
 GFX_ImplementTextureProfile(GFXFontTextureProfile,
                             GFXTextureProfile::DiffuseMap, 
@@ -1029,6 +1030,77 @@ void GFont::importStrip(const char *fileName, U32 padding, U32 kerning)
    // Ok, all done! Just refresh some textures and we're set.
    for(S32 i=0; i<sheetSizes.size(); i++)
       mTextureSheets[i].refresh();
+}
+
+bool GFont::writeToStream(Stream* stream) const
+{
+   if (!stream || !stream->hasCapability(Stream::StreamWrite))
+   {
+      Con::errorf("GFont::writeToStream - Invalid or unwritable stream.");
+      return false;
+   }
+
+   // Write version header
+   stream->write(csm_fileVersion);
+
+   // Basic metadata
+   stream->write(mFaceName);
+   stream->write(mSize);
+   stream->write(mCharSet);
+   stream->write(mHeight);
+   stream->write(mBaseline);
+   stream->write(mAscent);
+   stream->write(mDescent);
+
+   // Write char info
+   const U32 charCount = mCharInfoList.size();
+   stream->write(charCount);
+
+   for (U32 i = 0; i < charCount; i++)
+   {
+      const PlatformFont::CharInfo& ci = mCharInfoList[i];
+
+      stream->write(ci.bitmapIndex);
+      stream->write(ci.xOffset);
+      stream->write(ci.yOffset);
+      stream->write(ci.width);
+      stream->write(ci.height);
+      stream->write(ci.xOrigin);
+      stream->write(ci.yOrigin);
+      stream->write(ci.xIncrement);
+   }
+
+   // Write texture sheet count
+   const U32 sheetCount = mTextureSheets.size();
+   stream->write(sheetCount);
+
+   for (U32 i = 0; i < sheetCount; ++i)
+   {
+      GBitmap* bmp = mTextureSheets[i]->getBitmap();
+      if (!bmp)
+      {
+         Con::warnf("GFont::writeToStream - Null bitmap at index %u", i);
+         return false;
+      }
+
+      // Write each bitmap to disk as PNG
+      Torque::Path gftPath(mGFTFile);
+      String bmpFile = String::ToString("%s/%s_%u.png",
+         gftPath.getRootAndPath().c_str(),
+         gftPath.getFileName().c_str(),
+         i);
+
+      if (!bmp->writeBitmap("png", bmpFile, 0))
+      {
+         Con::errorf("GFont::writeToStream - Failed to write bitmap: %s", bmpFile.c_str());
+         return false;
+      }
+
+      // Write file reference into stream
+      stream->write(bmpFile);
+   }
+
+   return true;
 }
 
 DefineEngineFunction( populateFontCacheString, void, ( const char *faceName, S32 fontSize, const char *string ),,

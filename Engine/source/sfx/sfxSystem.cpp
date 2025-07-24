@@ -430,7 +430,11 @@ bool SFXSystem::createDevice( const String& providerName, const String& deviceNa
    mDevice = provider->createDevice( deviceName, useHardware, maxBuffers );
    if( !mDevice )
    {
-      Con::errorf( "SFXSystem::createDevice - failed creating %s device '%s'", providerName.c_str(), deviceName.c_str() );
+      if (deviceName.equal(String::EmptyString) || deviceName.equal("SFX Null Device"))
+         Con::printf( "SFXSystem::createDevice - Null device found %s device '%s'", providerName.c_str(), deviceName.c_str());
+      else
+         Con::errorf("SFXSystem::createDevice - failed creating %s device '%s'", providerName.c_str(), deviceName.c_str());
+
       return false;
    }
    

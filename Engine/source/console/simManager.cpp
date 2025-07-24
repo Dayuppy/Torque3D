@@ -36,6 +36,7 @@
 #include "platform/platformIntrinsics.h"
 #include "platform/profiler.h"
 #include "math/mMathFn.h"
+#include "core/ScheduledExecutionManager.h"
 
 //---------------------------------------------------------------------------
 //---------------------------------------------------------------------------
@@ -258,6 +259,9 @@ void advanceToTime(SimTime targetTime)
    gCurrentTime = targetTime;
 
    Mutex::unlockMutex(gEventQueueMutex);
+
+   // Let our central scheduler fire all due tasks
+   ScheduledExecutionManager::instance().processTasks();
 }
 
 void advanceTime(SimTime delta)

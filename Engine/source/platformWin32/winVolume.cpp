@@ -667,66 +667,89 @@ void Win32Directory::_updateStatus()
 
 } // Namespace Win32
 
-bool FS::VerifyWriteAccess(const Path &path)
+bool FS::VerifyWriteAccess(const Path& path)
 {
-   // due to UAC's habit of creating "virtual stores" when permission isn't actually available
-   // actually create, write, read, verify, and delete a file to the folder being tested
+#ifdef TORQUE_OS_WIN
 
-   String temp = path.getFullPath();
-   temp += "\\torque_writetest.tmp";
+   // Resolve to a file path within the directory
+   Path tempFile = path;
+   tempFile.setFileName("torque_writetest");
+   tempFile.setExtension("tmp");
 
-   // first, (try and) delete the file if it exists   
-   ::DeleteFileW(temp.utf16());
+   String tempPath = PathToOS(tempFile);
 
-   // now, create the file
+   // Delete file if it already exists
+   ::DeleteFileW(tempPath.utf16());
 
-   HANDLE hFile = ::CreateFileW(PathToOS(temp).utf16(),
-               GENERIC_WRITE, 0,
-               NULL, CREATE_ALWAYS,
-               FILE_ATTRIBUTE_NORMAL | FILE_FLAG_SEQUENTIAL_SCAN,
-               NULL);
+   // Try to create the file
+   HANDLE hFile = ::CreateFileW(
+      tempPath.utf16(),
+      GENERIC_WRITE,
+      0,
+      NULL,
+      CREATE_ALWAYS,
+      FILE_ATTRIBUTE_NORMAL,
+      NULL
+   );
 
-   if ( hFile == INVALID_HANDLE_VALUE || hFile == NULL )
+   if (hFile == INVALID_HANDLE_VALUE)
       return false;
 
-   U32 t = Platform::getTime();
+   DWORD bytesWritten = 0;
+   U32 testData = Platform::getRealMilliseconds();
 
-   DWORD bytesWritten;
-   if (!::WriteFile(hFile,&t,sizeof(t),&bytesWritten,0))
+   if (!::WriteFile(hFile, &testData, sizeof(testData), &bytesWritten, nullptr) || bytesWritten != sizeof(testData))
    {
       ::CloseHandle(hFile);
-      ::DeleteFileW(temp.utf16());
+      ::DeleteFileW(tempPath.utf16());
       return false;
    }
 
-   // close the file
    ::CloseHandle(hFile);
 
-   // open for read
+   // Try to read it back
+   hFile = ::CreateFileW(
+      tempPath.utf16(),
+      GENERIC_READ,
+      FILE_SHARE_READ,
+      NULL,
+      OPEN_EXISTING,
+      FILE_ATTRIBUTE_NORMAL,
+      NULL
+   );
 
-   hFile = ::CreateFileW(PathToOS(temp).utf16(),
-               GENERIC_READ, FILE_SHARE_READ,
-               NULL, OPEN_EXISTING,
-               FILE_ATTRIBUTE_NORMAL | FILE_FLAG_SEQUENTIAL_SCAN,
-               NULL);
-
-   if ( hFile == INVALID_HANDLE_VALUE || hFile == NULL )
+   if (hFile == INVALID_HANDLE_VALUE)
+   {
+      ::DeleteFileW(tempPath.utf16());
       return false;
+   }
 
+   U32 readData = 0;
+   DWORD bytesRead = 0;
+
+   bool success = ::ReadFile(hFile, &readData, sizeof(readData), &bytesRead, nullptr) &&
+      (bytesRead == sizeof(readData)) &&
+      (readData == testData);
+
+   ::CloseHandle(hFile);
+   ::DeleteFileW(tempPath.utf16());
+
+   return success;
+
+#else
+   // On non-Windows systems, just try using std::ofstream
+   FILE* f = fopen((path.getFullPath() + "/torque_writetest.tmp").c_str(), "w+");
+   if (!f)
+      return false;
+   U32 t = Platform::getRealMilliseconds();
+   fwrite(&t, sizeof(t), 1, f);
+   fseek(f, 0, SEEK_SET);
    U32 t2 = 0;
-
-   DWORD bytesRead;
-   if (!::ReadFile(hFile,&t2,sizeof(t2),&bytesRead,0))
-   {
-      ::CloseHandle(hFile);
-      ::DeleteFileW(temp.utf16());
-      return false;
-   }
-
-   ::CloseHandle(hFile);
-   ::DeleteFileW(temp.utf16());
-
+   fread(&t2, sizeof(t2), 1, f);
+   fclose(f);
+   remove((path.getFullPath() + "/torque_writetest.tmp").c_str());
    return t == t2;
+#endif
 }
 
 

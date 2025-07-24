@@ -179,9 +179,10 @@ inline void EngineMarshallData( char* arg, S32& argc, ConsoleValue *argv )
 }
 
 template< typename T >
-inline void EngineMarshallData( T* object, S32& argc, ConsoleValue *argv )
+// only marshal SimObject pointers to their ID
+inline void EngineMarshallData(SimObject * object, S32 & argc, ConsoleValue * argv)
 {
-   argv[ argc++ ].setInt(object ? object->getId() : 0);
+   argv[argc++].setInt(object ? object->getId() : 0);
 }
 template< typename T >
 inline void EngineMarshallData( const T* object, S32& argc, ConsoleValue *argv )

@@ -27,6 +27,7 @@
 #include "gui/controls/guiConsole.h"
 #include "gui/containers/guiScrollCtrl.h"
 #include "console/engineAPI.h"
+#include "gui/core/guiCanvas.h"
 
 IMPLEMENT_CONOBJECT(GuiConsole);
 
@@ -59,6 +60,8 @@ IMPLEMENT_CALLBACK(GuiConsole, onNewMessage, void, (U32 errorCount, U32 warnCoun
 
 //-----------------------------------------------------------------------------
 
+//-----------------------------------------------------------------------------
+// Constructor
 GuiConsole::GuiConsole()
 {
    setExtent(64, 64);
@@ -69,6 +72,88 @@ GuiConsole::GuiConsole()
    mDisplayWarnings = true;
    mDisplayNormalMessages = true;
    mFiltersDirty = true;
+
+   mHasSelection = false;
+   mSelectionStart.set(-1, -1);
+   mSelectionEnd.set(-1, -1);
+
+   GuiCanvas* root = getRoot();     // Requests keyboard focus at runtime
+   if (root)
+      root->makeFirstResponder(this);
+}
+
+
+// Mouse input for selection
+
+void GuiConsole::onMouseDown(const GuiEvent& event)
+{
+   Point2I local = globalToLocalCoord(event.mousePoint);
+   mSelectionStart = mSelectionEnd = getCellIndex(local);
+   mHasSelection = true;
+
+   Parent::onMouseDown(event);
+   if (GuiCanvas* canvas = getRoot())
+      canvas->setFirstResponder(this);
+
+   setUpdate();
+}
+
+void GuiConsole::onMouseDragged(const GuiEvent& event)
+{
+   Point2I local = globalToLocalCoord(event.mousePoint);
+   mSelectionEnd = getCellIndex(local);
+
+   setUpdate();
+}
+
+void GuiConsole::onMouseUp(const GuiEvent& event)
+{
+   if (GuiCanvas* canvas = getRoot())
+      canvas->setFirstResponder(this);
+}
+
+bool GuiConsole::onInputEvent(const InputEventInfo& event)
+{
+   GuiEvent guiEvent;
+   guiEvent.keyCode = event.deviceInst;
+   guiEvent.modifier = event.modifier;
+   return onKeyDown(guiEvent);
+}
+
+
+//-----------------------------------------------------------------------------
+// Copy selection with Ctrl+C
+
+bool GuiConsole::onKeyDown(const GuiEvent& event)
+{
+   if (!isFirstResponder())
+   {
+      return Parent::onKeyDown(event);
+   }
+
+   // Ctrl+C
+   if ((event.modifier & SI_CTRL) && (event.keyCode == KEY_C) && mHasSelection)
+   {
+      StringBuilder clipboard;
+
+      S32 startY = getMin(mSelectionStart.y, mSelectionEnd.y);
+      S32 endY = getMax(mSelectionStart.y, mSelectionEnd.y);
+
+      for (S32 i = startY; i <= endY && i < mFilteredLog.size(); ++i)
+      {
+         clipboard.append(mFilteredLog[i].mString);
+         clipboard.append("\n");
+      }
+
+      Platform::setClipboard(clipboard.end());
+
+      return true;
+   }
+
+   if (mFirstResponder && mFirstResponder != this)
+      return mFirstResponder->onKeyDown(event);
+
+   return Parent::onKeyDown(event);
 }
 
 //-----------------------------------------------------------------------------
@@ -184,21 +269,50 @@ void GuiConsole::onPreRender()
 }
 
 //-----------------------------------------------------------------------------
+// Render highlight + text
 
 void GuiConsole::onRenderCell(Point2I offset, Point2I cell, bool /*selected*/, bool /*mouseOver*/)
 {
-   ConsoleLogEntry &entry = mFilteredLog[cell.y];
+   ConsoleLogEntry& entry = mFilteredLog[cell.y];
+
+   bool isSelected = mHasSelection &&
+      cell.y >= getMin(mSelectionStart.y, mSelectionEnd.y) &&
+      cell.y <= getMax(mSelectionStart.y, mSelectionEnd.y);
+
+   if (isSelected)
+   {
+      RectI highlightRect(offset.x, offset.y, getExtent().x, mCellSize.y);
+      GFX->getDrawUtil()->drawRectFill(highlightRect, ColorI(100, 100, 255, 60)); // light blue
+   }
+
    switch (entry.mLevel)
    {
-      case ConsoleLogEntry::Normal:   GFX->getDrawUtil()->setBitmapModulation(mProfile->mFontColor); break;
-      case ConsoleLogEntry::Warning:  GFX->getDrawUtil()->setBitmapModulation(mProfile->mFontColorHL); break;
-      case ConsoleLogEntry::Error:    GFX->getDrawUtil()->setBitmapModulation(mProfile->mFontColorNA); break;
-      default: AssertFatal(false, "GuiConsole::onRenderCell - Unrecognized ConsoleLogEntry type, update this.");
+   case ConsoleLogEntry::Normal:   GFX->getDrawUtil()->setBitmapModulation(mProfile->mFontColor); break;
+   case ConsoleLogEntry::Warning:  GFX->getDrawUtil()->setBitmapModulation(mProfile->mFontColorHL); break;
+   case ConsoleLogEntry::Error:    GFX->getDrawUtil()->setBitmapModulation(mProfile->mFontColorNA); break;
    }
+
    GFX->getDrawUtil()->drawText(mFont, Point2I(offset.x + 3, offset.y), entry.mString, mProfile->mFontColors);
 }
 
 //-----------------------------------------------------------------------------
+//-----------------------------------------------------------------------------
+// Utility
+
+Point2I GuiConsole::getCellIndex(Point2I localPos)
+{
+   S32 row = localPos.y / mCellSize.y;
+   row = mClamp(row, 0, mSize.y - 1);
+   return Point2I(0, row);
+}
+
+void GuiConsole::clearSelection()
+{
+   mHasSelection = false;
+   mSelectionStart.set(-1, -1);
+   mSelectionEnd.set(-1, -1);
+   setUpdate();
+}
 
 void GuiConsole::onCellSelected( Point2I cell )
 {
@@ -225,7 +339,7 @@ void GuiConsole::setDisplayFilters(bool errors, bool warns, bool normal)
    mSize.set(1, mFilteredLog.size());
 
    //resize the control
-   setExtent(Point2I(mCellSize.x, mCellSize.y * mFilteredLog.size()));
+   setExtent(Point2I(mCellSize.x, mCellSize.y * GuiConsole::mFilteredLog.size()));
 
    scrollCellVisible(Point2I(0, mSize.y - 1));
 

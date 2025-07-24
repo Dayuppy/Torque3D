@@ -135,15 +135,15 @@ void ShaderGen::initShaderGen()
    Torque::FS::Remove( "shadergen:/" + ConditionerFeature::ConditionerIncludeFileName );
 }
 
-void ShaderGen::generateShader( const MaterialFeatureData &featureData,
-                                char *vertFile,
-                                char *pixFile,
-                                F32 *pixVersion,
-                                const GFXVertexFormat *vertexFormat,
-                                const char* cacheName,
-                                Vector<GFXShaderMacro> &macros)
+void ShaderGen::generateShader(const MaterialFeatureData& featureData,
+   char* vertFile,
+   char* pixFile,
+   F32* pixVersion,
+   const GFXVertexFormat* vertexFormat,
+   const char* cacheName,
+   Vector<GFXShaderMacro>& macros)
 {
-   PROFILE_SCOPE( ShaderGen_GenerateShader );
+   PROFILE_SCOPE(ShaderGen_GenerateShader);
 
    mFeatureData = featureData;
    mVertexFormat = vertexFormat;
@@ -151,64 +151,73 @@ void ShaderGen::generateShader( const MaterialFeatureData &featureData,
    _uninit();
    _init();
 
-   char vertShaderName[256];
-   char pixShaderName[256];
+   // Compute shadergen-relative paths (mount point already mapped to disk or memory)
+   String vertShaderRel = String::ToString("shadergen:/%s_V.%s", cacheName, mFileEnding.c_str());
+   String pixShaderRel = String::ToString("shadergen:/%s_P.%s", cacheName, mFileEnding.c_str());
 
-   // Note:  We use a postfix of _V/_P here so that it sorts the matching
-   // vert and pixel shaders together when listed alphabetically.
-   dSprintf( vertShaderName, sizeof(vertShaderName), "shadergen:/%s_V.%s", cacheName, mFileEnding.c_str() );
-   dSprintf( pixShaderName, sizeof(pixShaderName), "shadergen:/%s_P.%s", cacheName, mFileEnding.c_str() );
-
-   dStrcpy( vertFile, vertShaderName, 256 );
-   dStrcpy( pixFile, pixShaderName, 256 );
-
-   // this needs to change - need to optimize down to ps v.1.1
-   *pixVersion = GFX->getPixelShaderVersion();
-
-   if ( !Con::getBoolVariable( "ShaderGen::GenNewShaders", true ) )
+   // Resolve these to full OS paths
+   Torque::Path vertResolved, pixResolved;
+   if (!Torque::FS::GetFSPath(vertShaderRel, vertResolved) || !Torque::FS::GetFSPath(pixShaderRel, pixResolved))
    {
-      // If we are not regenerating the shader we will return here.
-      // But we must fill in the shader macros first!
-
-      _processVertFeatures( macros, true );
-      _processPixFeatures( macros, true );
-
+      Con::errorf("ShaderGen::generateShader - Failed to resolve shader paths to real files.");
       return;
    }
 
-   // create vertex shader
-   //------------------------
-   FileStream* s = new FileStream();
-   if(!s->open(vertShaderName, Torque::FS::File::Write ))
+   // Output full OS paths to vertFile and pixFile buffers
+   dStrncpy(vertFile, vertResolved.getFullPath().c_str(), 256);
+   dStrncpy(pixFile, pixResolved.getFullPath().c_str(), 256);
+
+   // Set pixel shader version
+   *pixVersion = GFX->getPixelShaderVersion();
+
+   // Early out if shader already exists and we're not forcing regen
+   if (!Con::getBoolVariable("ShaderGen::GenNewShaders", true))
    {
-      AssertFatal(false, "Failed to open Shader Stream" );
+      _processVertFeatures(macros, true);
+      _processPixFeatures(macros, true);
+
+      if (Torque::FS::IsFile(vertResolved) && Torque::FS::IsFile(pixResolved))
+      {
+         Con::printf("ShaderGen: Loaded cached shader %s", cacheName);
+         return;
+      }
+
+      Con::printf("ShaderGen: Missing cached shader files for %s; regenerating...", cacheName);
+   }
+
+   // Write vertex shader
+   FileStream* s = new FileStream();
+   if (!s->open(vertResolved, Torque::FS::File::Write))
+   {
+      AssertFatal(false, avar("ShaderGen::generateShader - Failed to open vertex shader stream: %s", vertResolved.getFullPath().c_str()));
+      delete s;
       return;
    }
 
    mOutput = new MultiLine;
    mInstancingFormat.clear();
    _processVertFeatures(macros);
-   _printVertShader( *s );
+   _printVertShader(*s);
    delete s;
 
+   // Reset connector state before pixel stage
    ((ShaderConnector*)mComponents[C_CONNECTOR])->reset();
    LangElement::deleteElements();
 
-   // create pixel shader
-   //------------------------
+   // Write pixel shader
    s = new FileStream();
-   if(!s->open(pixShaderName, Torque::FS::File::Write ))
+   if (!s->open(pixResolved, Torque::FS::File::Write))
    {
-      AssertFatal(false, "Failed to open Shader Stream" );
+      AssertFatal(false, avar("ShaderGen::generateShader - Failed to open pixel shader stream: %s", pixResolved.getFullPath().c_str()));
       delete s;
       return;
    }
 
    mOutput = new MultiLine;
    _processPixFeatures(macros);
-   _printPixShader( *s );
-
+   _printPixShader(*s);
    delete s;
+
    LangElement::deleteElements();
 }
 

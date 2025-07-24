@@ -1851,23 +1851,69 @@ void GFXDrawUtil::drawTransform( const GFXStateBlockDesc &desc, const MatrixF &m
    mDevice->drawPrimitive( GFXLineList, 0, 3 );
 }
 
-void GFXDrawUtil::drawTextShadowed(GFont* font, const Point2I& pos, const char* text, const ColorI& color, const ColorI& shadowColor)
+//-----------------------------------------------------------------------------
+// Draw text with a one‐pixel drop shadow at any offset, never leaking modulation.
+//-----------------------------------------------------------------------------
+void GFXDrawUtil::drawTextShadowed(GFont* font,
+   const Point2I& pos,
+   const Point2I& shadowOffset,
+   const char* text,
+   const ColorI& color,
+   const ColorI& shadowColor)
 {
-   if (!font || !text || !text[0])
+   if (!font || !text || !*text)
       return;
 
-   // Save current modulation color
-   ColorI prevColor;
-   getBitmapModulation(&prevColor);
+   // 1) Save the current modulation
+   ColorI prevMod;
+   getBitmapModulation(&prevMod);
 
-   // Draw shadow
+   // 2) Shadow pass: force our shadowColor into the register
    setBitmapModulation(shadowColor);
-   drawText(font, pos + Point2I(1, 1), text);
+   drawText(font, pos + shadowOffset, text);
 
-   // Draw main text
+   // 3) Main text: force our main color
    setBitmapModulation(color);
    drawText(font, pos, text);
 
-   // Restore previous color
-   setBitmapModulation(prevColor);
+   // 4) Restore whatever modulation was set before
+   setBitmapModulation(prevMod);
+}
+
+//-----------------------------------------------------------------------------
+// Draw text with an outline, never leaking modulation.
+//-----------------------------------------------------------------------------
+void GFXDrawUtil::drawTextOutlined(GFont* font,
+   const Point2I& pos,
+   const char* text,
+   const ColorI& color,
+   const ColorI& outlineColor,
+   S32            thickness)
+{
+   if (!font || !text || !*text)
+      return;
+
+   // Save current modulation
+   ColorI prevMod;
+   getBitmapModulation(&prevMod);
+
+   // Outline strokes
+   for (S32 dx = -thickness; dx <= thickness; ++dx)
+   {
+      for (S32 dy = -thickness; dy <= thickness; ++dy)
+      {
+         if (dx || dy)
+         {
+            setBitmapModulation(outlineColor);
+            drawText(font, pos + Point2I(dx, dy), text);
+         }
+      }
+   }
+
+   // Main text
+   setBitmapModulation(color);
+   drawText(font, pos, text);
+
+   // Restore
+   setBitmapModulation(prevMod);
 }

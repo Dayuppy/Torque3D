@@ -33,11 +33,13 @@
 #endif
 
 //----------------------------------------------------------------------------
+// torque physics support
+class PhysicsBody;
 
-struct StaticShapeData: public ShapeBaseData {
+struct StaticShapeData : public ShapeBaseData {
    typedef ShapeBaseData Parent;
 
-  public:
+public:
    StaticShapeData();
 
    bool  noIndividualDamage;
@@ -58,19 +60,20 @@ public:
 
 //----------------------------------------------------------------------------
 
-class StaticShape: public ShapeBase
+class StaticShape : public ShapeBase
 {
    typedef ShapeBase Parent;
 
-   StaticShapeData*  mDataBlock;
+   StaticShapeData* mDataBlock;
    bool              mPowered;
 
-   void onUnmount(SceneObject* obj,S32 node) override;
-
+   void onUnmount(SceneObject* obj, S32 node) override;
+   PhysicsBody* mPhysicsRep;
 protected:
    enum MaskBits {
-      PositionMask = Parent::NextFreeMask,	  
-      NextFreeMask = Parent::NextFreeMask << 1
+      PositionMask = Parent::NextFreeMask,
+      PhysicsMask = Parent::NextFreeMask << 1,
+      NextFreeMask = Parent::NextFreeMask << 2
    };
 
 public:
@@ -82,20 +85,21 @@ public:
 
    bool onAdd() override;
    void onRemove() override;
-   bool onNewDataBlock(GameBaseData *dptr, bool reload) override;
+   bool onNewDataBlock(GameBaseData* dptr, bool reload) override;
 
-   void processTick(const Move *move) override;
+   void processTick(const Move* move) override;
    void interpolateTick(F32 delta) override;
-   void setTransform(const MatrixF &mat) override;
+   void setTransform(const MatrixF& mat) override;
 
-   U32  packUpdate  (NetConnection *conn, U32 mask, BitStream *stream) override;
-   void unpackUpdate(NetConnection *conn,           BitStream *stream) override;
+   U32  packUpdate(NetConnection* conn, U32 mask, BitStream* stream) override;
+   void unpackUpdate(NetConnection* conn, BitStream* stream) override;
 
    // power
-   void setPowered(bool power)      {mPowered = power;}
-   bool isPowered()                 {return(mPowered);}
+   void setPowered(bool power) { mPowered = power; }
+   bool isPowered() { return(mPowered); }
 
-   static void initPersistFields();   
+   static void initPersistFields();
+   void updatePhysics();
 };
 
 

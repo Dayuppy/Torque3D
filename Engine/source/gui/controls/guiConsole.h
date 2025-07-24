@@ -44,6 +44,12 @@ class GuiConsole : public GuiArrayCtrl
       bool mDisplayNormalMessages;
       bool mFiltersDirty;
 
+      Point2I mSelectionStart, mSelectionEnd;
+      bool mHasSelection;
+
+      Point2I getCellIndex(Point2I localPos);
+      void clearSelection();
+
       S32 getMaxWidth(S32 startIndex, S32 endIndex);
 
       Vector<ConsoleLogEntry> mFilteredLog;
@@ -95,6 +101,13 @@ class GuiConsole : public GuiArrayCtrl
       }
 
       void refreshLogText();
+
+      virtual bool onInputEvent(const InputEventInfo& event) override;
+
+      virtual void onMouseDown(const GuiEvent& event) override;
+      virtual void onMouseDragged(const GuiEvent& event) override;
+      virtual void onMouseUp(const GuiEvent& event) override;
+      virtual bool onKeyDown(const GuiEvent& event) override;
 };
 
 #endif

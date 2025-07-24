@@ -1031,7 +1031,17 @@ GFXD3D11VertexBuffer * GFXD3D11Device::createVBPool( const GFXVertexFormat *vert
    vertexFormat->getDecl();
 
    D3D11_BUFFER_DESC desc;
-   desc.ByteWidth = vertSize * GFX_MAX_DYNAMIC_VERTS;
+
+   U32 totalBytes = vertSize * GFX_MAX_DYNAMIC_VERTS;
+   if (totalBytes == 0 || totalBytes > 16 * 1024 * 1024) // 16MB safety cap
+   {
+      Con::errorf("createVBPool: Bad vertex size or request too large! vertSize=%u totalBytes=%u", vertSize, totalBytes);
+      //AssertFatal(false, "createVBPool: Refusing to allocate unreasonably large VB");
+      return NULL; // Return NULL to indicate failure instead of crashing.
+   }
+
+   desc.ByteWidth = totalBytes;
+
    desc.Usage = D3D11_USAGE_DYNAMIC;
    desc.BindFlags = D3D11_BIND_VERTEX_BUFFER;
    desc.CPUAccessFlags = D3D11_CPU_ACCESS_WRITE;

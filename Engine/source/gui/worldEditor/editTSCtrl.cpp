@@ -852,48 +852,122 @@ void EditTSCtrl::_renderScene( ObjectRenderInst*, SceneRenderState *state, BaseM
 void EditTSCtrl::renderMissionArea()
 {
    MissionArea* obj = MissionArea::getServerObject();
-   if ( !obj )
+   if (!obj)
       return;
 
-   if ( !mRenderMissionArea && !obj->isSelected() )
+   // only render if enabled or selected
+   if (!mRenderMissionArea && !obj->isSelected())
       return;
 
-   GFXDEBUGEVENT_SCOPE( Editor_renderMissionArea, ColorI::WHITE );
+   GFXDEBUGEVENT_SCOPE(Editor_renderMissionArea, ColorI::WHITE);
 
-   F32 minHeight = 0.0f;
-   F32 maxHeight = 0.0f;
-
+   // 1) figure out terrain base height
+   F32 groundH = 0.0f;
    TerrainBlock* terrain = getActiveTerrain();
-   if ( terrain )
+   if (terrain)
    {
-      terrain->getMinMaxHeight( &minHeight, &maxHeight );
-      Point3F pos = terrain->getPosition();
-
-      maxHeight += pos.z + mMissionAreaHeightAdjust;
-      minHeight += pos.z - mMissionAreaHeightAdjust;
+      F32 minT, maxT;
+      terrain->getMinMaxHeight(&minT, &maxT);
+      groundH = terrain->getPosition().z + minT;
    }
 
-   const RectI& area = obj->getArea();
-   Box3F areaBox( area.point.x,
-                  area.point.y,
-                  minHeight,
-                  area.point.x + area.extent.x,
-                  area.point.y + area.extent.y,
-                  maxHeight );
+   // 2) flight ceiling from missionArea
+   F32 ceilingH = groundH + obj->getFlightCeiling();
+
+   // 3) do we have a real polygon?
+   const String& poly = obj->getPolyString();
+   const Vector<Point2I>& pts = obj->getPoly();
+   if (!poly.isEmpty() && pts.size() >= 3)
+   {
+      const U32 n = pts.size();
+
+      // build bottom & top loops
+      Vector<Point3F> bottom, top;
+      bottom.reserve(n);
+      top.reserve(n);
+      for (U32 i = 0; i < n; ++i)
+      {
+         const Point2I& p = pts[i];
+         bottom.push_back(Point3F((F32)p.x, (F32)p.y, groundH));
+         top.push_back(Point3F((F32)p.x, (F32)p.y, ceilingH));
+      }
+
+      // --- filled sides + top cap ---
+      GFX->setStateBlock(mBlendSB);
+      PrimBuild::color(mMissionAreaFillColor);
+
+      // sides: n edges × 2 triangles
+      PrimBuild::begin(GFXTriangleList, n * 6 + (n - 2) * 3);
+      for (U32 i = 0; i < n; ++i)
+      {
+         U32 j = (i + 1) % n;
+         // tri1
+         PrimBuild::vertex3fv(bottom[i]);
+         PrimBuild::vertex3fv(bottom[j]);
+         PrimBuild::vertex3fv(top[j]);
+         // tri2
+         PrimBuild::vertex3fv(bottom[i]);
+         PrimBuild::vertex3fv(top[j]);
+         PrimBuild::vertex3fv(top[i]);
+      }
+      // top cap
+      for (U32 i = 1; i + 1 < n; ++i)
+      {
+         PrimBuild::vertex3fv(top[0]);
+         PrimBuild::vertex3fv(top[i]);
+         PrimBuild::vertex3fv(top[i + 1]);
+      }
+      PrimBuild::end();
+
+      // --- wireframe edges ---
+      PrimBuild::color(mMissionAreaFrameColor);
+
+      // bottom loop
+      PrimBuild::begin(GFXLineStrip, n + 1);
+      for (auto& v : bottom) PrimBuild::vertex3fv(v);
+      PrimBuild::vertex3fv(bottom[0]);
+      PrimBuild::end();
+
+      // top loop
+      PrimBuild::begin(GFXLineStrip, n + 1);
+      for (auto& v : top) PrimBuild::vertex3fv(v);
+      PrimBuild::vertex3fv(top[0]);
+      PrimBuild::end();
+
+      // verticals
+      PrimBuild::begin(GFXLineList, n * 2);
+      for (U32 i = 0; i < n; ++i)
+      {
+         PrimBuild::vertex3fv(bottom[i]);
+         PrimBuild::vertex3fv(top[i]);
+      }
+      PrimBuild::end();
+
+      return;
+   }
+
+   // --- fallback to legacy rectangle box ---
+   const RectI& r = obj->getArea();
+   Box3F box(
+      r.point.x, r.point.y, groundH,
+      r.point.x + r.extent.x, r.point.y + r.extent.y, ceilingH
+   );
 
    GFXDrawUtil* drawer = GFX->getDrawUtil();
-
    GFXStateBlockDesc desc;
-   desc.setCullMode( GFXCullNone );
-   desc.setBlend( true );
-   desc.setZReadWrite( false, false );
+   desc.setCullMode(GFXCullNone);
+   desc.setBlend(true);
+   desc.setZReadWrite(false, false);
 
+   // solid fill
    desc.setFillModeSolid();
-   drawer->drawCube( desc, areaBox, mMissionAreaFillColor );
+   drawer->drawCube(desc, box, mMissionAreaFillColor);
 
+   // wireframe
    desc.setFillModeWireframe();
-   drawer->drawCube( desc, areaBox, mMissionAreaFrameColor );
+   drawer->drawCube(desc, box, mMissionAreaFrameColor);
 }
+
 
 void EditTSCtrl::renderCameraAxis()
 {

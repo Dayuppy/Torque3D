@@ -211,7 +211,7 @@ TerrainBlock::TerrainBlock()
    mOrmTextureArray( NULL ),
    mNormalTextureArray( NULL )
 {
-   mTypeMask = TerrainObjectType | StaticObjectType | StaticShapeObjectType;
+   mTypeMask = TerrainObjectType; //| StaticObjectType | StaticShapeObjectType;
    mNetFlags.set(Ghostable | ScopeAlways);
    mIgnoreZodiacs = false;
    zode_primBuffer = 0;

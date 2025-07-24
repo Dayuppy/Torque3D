@@ -29,6 +29,11 @@
 #include "platform/profiler.h"
 #include "console/engineAPI.h"
 #include "math/util/frustum.h"
+#include "materials/materialDefinition.h"
+#include "T3D/staticShape.h"
+#include "T3D/tsStatic.h"
+#include "T3D/fx/particleEmitter.h"
+#include "ts/tsShapeInstance.h"
 
 
 // [rene, 02-Mar-11]
@@ -1717,7 +1722,9 @@ DefineEngineFunction(materialRayCast, const char*,
 
    RayInfo rinfo;
    S32 ret = 0;
-   if (pContainer->castRayRendered(start, end, mask, &rinfo) == true)
+   //if (pContainer->castRay(start, end, mask, &rinfo))
+      //ret = rinfo.object->getId();
+   if (pContainer->castRayRendered(start, end, mask, &rinfo))
       ret = rinfo.object->getId();
 
    if (pExempt)
@@ -1728,9 +1735,20 @@ DefineEngineFunction(materialRayCast, const char*,
    char* returnBuffer = Con::getReturnBuffer(bufSize);
    if (ret)
    {
-      dSprintf(returnBuffer, bufSize, "%d %g %g %g %g %g %g %g %g %g %s",
-         ret, rinfo.point.x, rinfo.point.y, rinfo.point.z,
-         rinfo.normal.x, rinfo.normal.y, rinfo.normal.z, rinfo.distance, rinfo.texCoord.x, rinfo.texCoord.y, rinfo.material ? rinfo.material->getMaterial()->getName() : "");
+      const char* matName = "null";
+      if (rinfo.material)
+      {
+         Material* material = dynamic_cast<Material*>(rinfo.material->getMaterial());
+         if (material && material->getName())
+            matName = material->getName();
+      }
+
+      dSprintf(returnBuffer, bufSize, "%d %g %g %g %g %g %g %g %s",
+         ret,
+         rinfo.point.x, rinfo.point.y, rinfo.point.z,
+         rinfo.normal.x, rinfo.normal.y, rinfo.normal.z,
+         rinfo.distance,
+         matName);
    }
    else
    {
@@ -1738,7 +1756,7 @@ DefineEngineFunction(materialRayCast, const char*,
       returnBuffer[1] = '\0';
    }
 
-   return(returnBuffer);
+   return returnBuffer;
 }
 
 ConsoleFunctionGroupEnd( Containers );

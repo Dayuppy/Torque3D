@@ -9,6 +9,8 @@
 class GuiCompassControl : public GuiControl
 {
    typedef GuiControl Parent;
+protected:
+   F32  mFrameCornerRadius;
 
 public:
    DECLARE_CONOBJECT(GuiCompassControl);

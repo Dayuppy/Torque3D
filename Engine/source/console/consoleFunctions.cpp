@@ -2803,6 +2803,28 @@ DefineEngineFunction(getTimestamp, const char*, (), ,
    return returnBuffer;
 }
 
+//DT
+DefineEngineFunction(fnv1a, const char *, (const char *str), ,
+                     "Computes the 32-bit FNV-1a hash of the input string.\n"
+                     "@param str The input string to hash.\n"
+                     "@return A decimal string representing the hash value.\n"
+                     "@ingroup Strings")
+{
+   U32 hash = 2166136261U;
+
+   const char *p = str;
+   while (*p)
+   {
+      hash ^= static_cast<U8>(*p); // XOR byte into the low 8 bits of hash
+      hash *= 16777619U;           // Multiply by the FNV prime
+      p++;
+   }
+
+   char *ret = Con::getReturnBuffer(16); // enough to store 10-digit hash + null
+   dSprintf(ret, 16, "%u", hash);        // return as decimal string
+   return ret;
+}
+
 #ifdef TORQUE_TOOLS
 DefineEngineFunction(systemCommand, S32, (const char* commandLineAction, const char* callBackFunction), (""), "")
 {

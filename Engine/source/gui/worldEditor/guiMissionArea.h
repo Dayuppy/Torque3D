@@ -122,8 +122,11 @@ public:
    bool onAdd() override;
    static void initPersistFields();
 
+   void getScreenMissionPoly(Vector<Point2F>& outPoly);
+
    // GuiControl
    void onRender(Point2I offset, const RectI &updateRect) override;
+   void renderMissionPrism();
    bool onWake() override;
    void onSleep() override;
 
