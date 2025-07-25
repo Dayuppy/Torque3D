@@ -6,6 +6,7 @@
 #include "console/engineAPI.h"
 #include "gfx/gfxTextureProfile.h"
 
+
 IMPLEMENT_CONOBJECT(GuiBitmapItemExtended);
 ConsoleDocClass(GuiBitmapItemExtended,
    "@brief GUI control: square bitmap with optional rotation, tint, shadow, background, text overlay, and customizable font.\n"
@@ -242,3 +243,13 @@ void GuiBitmapItemExtended::onRender(Point2I offset, const RectI& updateRect)
    du->setBitmapModulation(prevMod);
    renderChildControls(offset, updateRect);
 }
+
+void GuiBitmapItemExtended::onMouseDragged(const GuiEvent& event)
+{
+   Parent::onMouseDragged(event);
+}
+
+IMPLEMENT_CALLBACK(GuiBitmapItemExtended, onMouseDragged, void, (), (),
+   "If #useMouseEvents is true, this is called when a left mouse button drag is detected, i.e. when the user "
+   "pressed the left mouse button on the control and then moves the mouse over a certain distance threshold with "
+   "the mouse button still pressed.");

@@ -11,6 +11,7 @@
 #include "gfx/gfxDrawUtil.h"
 #include "gfx/gFont.h"
 
+
 class GuiBitmapItemExtended : public GuiControl
 {
    typedef GuiControl Parent;
@@ -20,6 +21,7 @@ public:
    virtual ~GuiBitmapItemExtended() {}
 
    DECLARE_CONOBJECT(GuiBitmapItemExtended);
+   DECLARE_CALLBACK(void, onMouseDragged, ());
    static void initPersistFields();
 
 protected:
@@ -66,4 +68,5 @@ protected:
    bool onAdd() override;
    bool onWake() override;
    void onRender(Point2I offset, const RectI& updateRect) override;
+   void onMouseDragged(const GuiEvent& event) override;
 };
