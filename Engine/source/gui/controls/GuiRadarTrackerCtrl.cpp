@@ -1,4 +1,4 @@
-﻿#include "guiRadarTrackerCtrl.h"
+#include "guiRadarTrackerCtrl.h"
 #include "gfx/gfxDrawUtil.h"
 #include "math/mMathFn.h"
 #include "platform/platformTimer.h"
@@ -16,21 +16,28 @@ GuiRadarTrackerCtrl::GuiRadarTrackerCtrl()
     mUpdateTimer = 0.0f;
     mLastRenderTime = Platform::getRealMilliseconds();
     mRadarMode = Pulse;
-    mPulseSpeed = 30.0f;
+    mPulseSpeed = 45.0f;
     mCenterObject = nullptr;
-    mSweepTrailArc = 30.0f;
+    mSweepTrailArc = 45.0f;
     mSweepTrailSteps = 12;
     // trail stays for one full second by default
     mSweepFadeTime = 0.20f;
     mSweepHistory.clear();
+    mMaxRange = 256.0f;
 }
 
 bool GuiRadarTrackerCtrl::onWake()
 {
-    if (!Parent::onWake())
-        return false;
-    setProcessTicks(true);
-    return true;
+   if (!Parent::onWake())
+      return false;
+   setProcessTicks(true);
+
+   // load a blocky console font at size 12
+   mConsoleFont = GFont::create("Terminal", 12);
+   if (!mConsoleFont)
+      Con::warnf("GuiRadarTrackerCtrl: failed to load console font 'Terminal', falling back.");
+
+   return true;
 }
 
 void GuiRadarTrackerCtrl::onSleep()
@@ -120,32 +127,40 @@ void GuiRadarTrackerCtrl::renderPulse(const RectI& bounds, const Point2I& origin
 
 void GuiRadarTrackerCtrl::onRender(Point2I offset, const RectI& updateRect)
 {
-    RectI bounds = getBounds();
-    GFXDrawUtil* drawer = GFX->getDrawUtil();
+   RectI bounds = getBounds();
+   GFXDrawUtil* drawer = GFX->getDrawUtil();
 
-    // compute center & radius
-    Point2I origin = bounds.point + bounds.extent / 2;
-    F32     radius = getMin(bounds.extent.x, bounds.extent.y) * 0.5f;
+   // compute center, pixel radius and corresponding world range
+   Point2I origin = bounds.point + bounds.extent / 2;
+   F32     pixelRadius = getMin(bounds.extent.x, bounds.extent.y) * 0.5f;
+   F32     worldMax = pixelRadius * mZoom;
 
-    // circular background fill at 50% opacity (alpha=128)
-    Point2F ul(origin.x - radius, origin.y - radius);
-    Point2F lr(origin.x + radius, origin.y + radius);
-    drawer->drawCircleFill(
-        ul, lr,
-        ColorI(0, 0, 0, 128),  // solid fill
-        radius,                // matching radius
-        0.0f,                  // no border
-        ColorI(0, 0, 0, 0)   // border color irrelevant
-    );
+   // --- Restore circular background fill (50% opaque black) ---
+   Point2F ul(origin.x - pixelRadius, origin.y - pixelRadius);
+   Point2F lr(origin.x + pixelRadius, origin.y + pixelRadius);
+   drawer->drawCircleFill(
+      ul,
+      lr,
+      ColorI(0, 0, 0, 128),  // fill color
+      pixelRadius,           // radius must match pixelRadius
+      0.0f,                  // no border
+      ColorI(0, 0, 0, 0)     // border color (unused)
+   );
 
-    renderGrid(bounds, origin);
-    if (mRadarMode == Pulse)
-        renderPulse(bounds, origin);
-    else
-        renderSweep(bounds, origin);
-    renderBlips(bounds, origin);
-    renderChildControls(offset, updateRect);
+   // draw grid and sweep/pulse
+   renderGrid(bounds, origin);
+   if (mRadarMode == Pulse)
+      renderPulse(bounds, origin);
+   else
+      renderSweep(bounds, origin);
+
+   // draw blips with max‐range clamping, brackets, and distances
+   renderBlips(bounds, origin, pixelRadius, worldMax);
+
+   // any child controls on top
+   renderChildControls(offset, updateRect);
 }
+
 
 void GuiRadarTrackerCtrl::renderGrid(const RectI& bounds, const Point2I& origin)
 {
@@ -206,75 +221,110 @@ void GuiRadarTrackerCtrl::renderSweep(const RectI& bounds, const Point2I& origin
     }
 }
 
-void GuiRadarTrackerCtrl::renderBlips(const RectI& bounds, const Point2I& origin)
+void GuiRadarTrackerCtrl::renderBlips(const RectI& bounds,
+   const Point2I& origin,
+   F32 pixelRadius,
+   F32 worldMax)
 {
-    if (!mCenterObject)
-        return;
+   if (!mCenterObject)
+      return;
 
-    GFXDrawUtil* drawer = GFX->getDrawUtil();
-    Point3F      center = mCenterObject->getPosition();
-    MatrixF      xf = mCenterObject->getTransform();
+   GFXDrawUtil* drawer = GFX->getDrawUtil();
+   // Use the profile font (fallback) to guarantee text renders
+   GFont* font = mProfile->mFont;
+   Point3F center = mCenterObject->getPosition();
+   MatrixF xf = mCenterObject->getTransform();
 
-    // Precompute sweep‐arc bounds
-    F32 halfArc = mSweepTrailArc * 0.5f;
-    F32 sweepStart = mFmod(mScanAngle - halfArc + 360.0f, 360.0f);
-    F32 sweepEnd = mFmod(mScanAngle + halfArc, 360.0f);
+   // Precompute sweep‐arc bounds
+   F32 halfArc = mSweepTrailArc * 0.5f;
+   F32 sweepStart = mFmod(mScanAngle - halfArc + 360.0f, 360.0f);
+   F32 sweepEnd = mFmod(mScanAngle + halfArc, 360.0f);
 
-    const F32 minAlphaF = 48.0f / 255.0f;
-    const U8  minAlphaU8 = 48;
-    const F32 pulseMargin = 8.0f;
+   const U8  minAlphaU8 = 48;
+   const F32 pulseMargin = 8.0f;
 
-    for (const RadarContact& c : mContacts)
-    {
-        // world → radar‐space
-        Point2F radarPos = worldToRadar(c.worldPos, center, xf);
-        F32     dist = radarPos.len();
-        if (dist < 0.01f)
-            continue;
+   for (const RadarContact& c : mContacts)
+   {
+      // 1) Transform world→radar‐space (pixels)
+      Point2F radarPos = worldToRadar(c.worldPos, center, xf);
+      F32     worldDist = radarPos.len() * mZoom;
+      if (worldDist < 0.01f)
+         continue;
 
-        // Base alpha (already clamped to ≥48/255 in onPreRender)
-        U8 alpha = U8(c.alpha * 255.0f);
+      // 2) Clamp beyond max range to the edge
+      if (worldDist > worldMax)
+      {
+         radarPos.normalizeSafe();
+         radarPos *= pixelRadius;
+      }
 
-        if (mRadarMode == Sweep)
-        {
-            // Only highlight when inside sweep arc
-            F32 localAngle = mFmod(
-                mRadToDeg(mAtan2(radarPos.y, radarPos.x)) + 360.0f,
-                360.0f
-            );
-            bool inArc = (sweepStart < sweepEnd)
-                ? (localAngle >= sweepStart && localAngle <= sweepEnd)
-                : (localAngle >= sweepStart || localAngle <= sweepEnd);
-            if (inArc)
-                alpha = 255;
-        }
-        else // Pulse mode
-        {
-            // Always draw, but boost alpha while the ring overlaps
-            bool inPulse = (dist >= (mPulseRing.radius - pulseMargin)
-                && dist <= (mPulseRing.radius + pulseMargin));
-            if (inPulse)
-            {
-                // fully visible when pulse hits
-                alpha = 255;
-            }
-            // otherwise leave alpha at its stale value (≥48)
-        }
+      // 3) Base alpha from onPreRender (already ≥48/255)
+      U8 alpha = U8(c.alpha * 255.0f);
 
-        // Enforce absolute floor
-        alpha = getMax(alpha, minAlphaU8);
+      // 4) Highlight if currently scanned
+      if (mRadarMode == Sweep)
+      {
+         F32 localAngle = mFmod(
+            mRadToDeg(mAtan2(radarPos.y, radarPos.x)) + 360.0f,
+            360.0f
+         );
+         bool inArc = (sweepStart < sweepEnd)
+            ? (localAngle >= sweepStart && localAngle <= sweepEnd)
+            : (localAngle >= sweepStart || localAngle <= sweepEnd);
+         if (inArc) alpha = 255;
+      }
+      else // Pulse
+      {
+         bool inPulse = (worldDist >= (mPulseRing.radius - pulseMargin) &&
+            worldDist <= (mPulseRing.radius + pulseMargin));
+         if (inPulse) alpha = 255;
+      }
 
-        // Transform to screen coordinates
-        Point2I screen(
-            origin.x + S32(radarPos.x / mZoom),
-            origin.y - S32(radarPos.y / mZoom)
-        );
+      // 5) Enforce floor
+      alpha = getMax(alpha, minAlphaU8);
 
-        drawer->drawRectFill(
-            RectI(screen - Point2I(2, 2), Point2I(4, 4)),
-            ColorI(255, 0, 0, alpha)
-        );
-    }
+      // 6) Compute screen coords
+      Point2I screen(
+         origin.x + S32(radarPos.x),
+         origin.y - S32(radarPos.y)
+      );
+
+      // 7) Draw brackets
+      ColorI bracketColor(0, 160, 0, alpha);
+      const S32 b = 3;
+      drawer->drawLine(screen + Point2I(-b, -b), screen + Point2I(-b / 2, -b), bracketColor);
+      drawer->drawLine(screen + Point2I(-b, b), screen + Point2I(-b / 2, b), bracketColor);
+      drawer->drawLine(screen + Point2I(b, -b), screen + Point2I(b / 2, -b), bracketColor);
+      drawer->drawLine(screen + Point2I(b, b), screen + Point2I(b / 2, b), bracketColor);
+      drawer->drawLine(screen + Point2I(-b, -b), screen + Point2I(-b, -b / 2), bracketColor);
+      drawer->drawLine(screen + Point2I(b, -b), screen + Point2I(b, -b / 2), bracketColor);
+      drawer->drawLine(screen + Point2I(-b, b), screen + Point2I(-b, b / 2), bracketColor);
+      drawer->drawLine(screen + Point2I(b, b), screen + Point2I(b, b / 2), bracketColor);
+
+      // 8) Draw the center dot
+      drawer->drawRectFill(
+         RectI(screen - Point2I(1, 1), Point2I(2, 2)),
+         ColorI(0, 255, 0, alpha)
+      );
+
+      // 9) draw distance text in crisp console font
+      char buf[16];
+      dSprintf(buf, sizeof(buf), "%dm", S32(worldDist));
+      Point2I textPos(screen.x + b + 2, screen.y - font->getHeight() / 2);
+
+      // outline black, fill bright CRT green
+      ColorI fillColor(0, 255, 0, alpha);
+      ColorI outlineColor(0, 0, 0, alpha);
+
+      drawer->drawTextOutlined(
+         font,
+         textPos,
+         buf,
+         fillColor,
+         outlineColor,
+         1  // outline thickness
+      );
+   }
 }
 
 void GuiRadarTrackerCtrl::updateTrackedObjects()

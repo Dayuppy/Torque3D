@@ -39,6 +39,10 @@ protected:
     enum RadarMode { Pulse = 0, Sweep = 1 };
 
     struct TrackedObject { SceneObject* object; };
+
+    // Maximum world‐space range (meters) the radar will display:
+    F32 mMaxRange;
+
     struct RadarContact
     {
         Point3F worldPos;
@@ -59,6 +63,8 @@ protected:
     Vector<RadarContact> mContacts;
 
     SceneObject* mCenterObject;
+
+    Resource<GFont> mConsoleFont;
 
     F32 mZoom;
     F32 mScanAngle;
@@ -84,10 +90,11 @@ protected:
     PulseRing mPulseRing;
 
     void updateTrackedObjects();
-    void renderBlips(const RectI& bounds, const Point2I& origin);
+
     void renderGrid(const RectI& bounds, const Point2I& origin);
     void renderPulse(const RectI& bounds, const Point2I& origin);
     void renderSweep(const RectI& bounds, const Point2I& origin);
+    void renderBlips(const RectI& bounds, const Point2I& origin, F32 pixelRadius, F32 worldMax);
     Point2F worldToRadar(const Point3F& pos, const Point3F& center, const MatrixF& xf);
 
     // Inherited via ITickable
