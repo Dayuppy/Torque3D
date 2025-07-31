@@ -163,6 +163,10 @@ IMPLEMENT_CALLBACK( GuiControl, onControlDropped, void, ( GuiControl* control, c
    "@param control The control that is being dropped onto this control.\n"
    "@param dropPoint The point at which the control is being dropped.  Relative to the canvas." );
 
+IMPLEMENT_CALLBACK(GuiControl, onRightMouseDown, void, (const S32& x, const S32& y), (x, y),
+   "Called when the right mouse button is pressed on this control.\n\n"
+   "@param event The mouse event for this right button press."
+);
 
 GuiControl *GuiControl::smPrevResponder = NULL;
 GuiControl *GuiControl::smCurResponder = NULL;
@@ -1051,8 +1055,10 @@ bool GuiControl::onMouseWheelDown( const GuiEvent &event )
 
 //-----------------------------------------------------------------------------
 
-void GuiControl::onRightMouseDown(const GuiEvent &)
+void GuiControl::onRightMouseDown(const GuiEvent &event)
 {
+   // Call the script callback
+   onRightMouseDown_callback(event.mousePoint.x, event.mousePoint.y);
 }
 
 //-----------------------------------------------------------------------------

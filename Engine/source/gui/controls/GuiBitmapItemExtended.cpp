@@ -5,7 +5,9 @@
 #include "GuiBitmapItemExtended.h"
 #include "console/engineAPI.h"
 #include "gfx/gfxTextureProfile.h"
+#include "gui/core/guiCanvas.h"
 
+static const char* sForceGlowFieldName = "forceGlow";
 
 IMPLEMENT_CONOBJECT(GuiBitmapItemExtended);
 ConsoleDocClass(GuiBitmapItemExtended,
@@ -13,8 +15,120 @@ ConsoleDocClass(GuiBitmapItemExtended,
    "@ingroup GuiControls"
 );
 
+IMPLEMENT_CALLBACK(GuiBitmapItemExtended, onMouseDragged, void, (), (),
+   "If #useMouseEvents is true, this is called when a left mouse button drag is detected, i.e. when the user "
+   "pressed the left mouse button on the control and then moves the mouse over a certain distance threshold with "
+   "the mouse button still pressed.");
+
+IMPLEMENT_CALLBACK(GuiBitmapItemExtended, onMouseUp, void, (), (),
+   "If #useMouseEvents is true, this is called when the left mouse button is release over an (active) "
+   "button.\n\n"
+   "@note To trigger actions, better use onClick() since onMouseUp() will also be called when the mouse was "
+   "not originally pressed on the button.");
+
+IMPLEMENT_CALLBACK(GuiBitmapItemExtended, onMouseEnter, void, (), (),
+   "If #useMouseEvents is true, this is called when the mouse cursor moves over the button (only if the button "
+   "is the front-most visible control, though).");
+
+IMPLEMENT_CALLBACK(GuiBitmapItemExtended, onMouseLeave, void, (), (),
+   "If #useMouseEvents is true, this is called when the mouse cursor moves off the button (only if the button "
+   "had previously received an onMouseEvent() event).");
+
+
 //-----------------------------------------------------------------------------
-// _setBitmapAsset
+// Asset setters (same style as icon)
+//-----------------------------------------------------------------------------
+bool GuiBitmapItemExtended::_setBitmapFrameAsset(void* obj, const char* index, const char* data)
+{
+   GuiBitmapItemExtended* ctrl = static_cast<GuiBitmapItemExtended*>(obj);
+   if (ctrl->mBitmapFrameAsset.notNull())
+      ctrl->mBitmapFrameAsset->getChangedSignal().remove(ctrl, &GuiBitmapItemExtended::onFrameAssetRefresh);
+
+   if (!data || !*data)
+   {
+      ctrl->mBitmapFrameAsset.clear();
+      ctrl->mBitmapFrame = GFXTexHandle();
+   }
+   else
+   {
+      ctrl->mBitmapFrameAsset = AssetPtr<ImageAsset>(StringTable->insert(data));
+      ctrl->mBitmapFrameAsset->getChangedSignal().notify(ctrl, &GuiBitmapItemExtended::onFrameAssetRefresh);
+      ctrl->mBitmapFrame = ctrl->mBitmapFrameAsset->getTexture(&GFXDefaultGUIProfile);
+   }
+   ctrl->setUpdate();
+   return false;
+}
+const char* GuiBitmapItemExtended::_getBitmapFrameAsset(void* obj, const char* data)
+{
+   GuiBitmapItemExtended* ctrl = static_cast<GuiBitmapItemExtended*>(obj);
+   return ctrl->mBitmapFrameAsset.notNull() ? ctrl->mBitmapFrameAsset->getAssetId() : StringTable->EmptyString();
+}
+
+bool GuiBitmapItemExtended::_setBitmapGlowAsset(void* obj, const char* index, const char* data)
+{
+   GuiBitmapItemExtended* ctrl = static_cast<GuiBitmapItemExtended*>(obj);
+   if (ctrl->mBitmapGlowAsset.notNull())
+      ctrl->mBitmapGlowAsset->getChangedSignal().remove(ctrl, &GuiBitmapItemExtended::onGlowAssetRefresh);
+
+   if (!data || !*data)
+   {
+      ctrl->mBitmapGlowAsset.clear();
+      ctrl->mBitmapGlow = GFXTexHandle();
+   }
+   else
+   {
+      ctrl->mBitmapGlowAsset = AssetPtr<ImageAsset>(StringTable->insert(data));
+      ctrl->mBitmapGlowAsset->getChangedSignal().notify(ctrl, &GuiBitmapItemExtended::onGlowAssetRefresh);
+      ctrl->mBitmapGlow = ctrl->mBitmapGlowAsset->getTexture(&GFXDefaultGUIProfile);
+   }
+   ctrl->setUpdate();
+   return false;
+}
+const char* GuiBitmapItemExtended::_getBitmapGlowAsset(void* obj, const char* data)
+{
+   GuiBitmapItemExtended* ctrl = static_cast<GuiBitmapItemExtended*>(obj);
+   return ctrl->mBitmapGlowAsset.notNull() ? ctrl->mBitmapGlowAsset->getAssetId() : StringTable->EmptyString();
+}
+
+//-----------------------------------------------------------------------------
+// DefineEngineMethod to force glow from script
+//-----------------------------------------------------------------------------
+DefineEngineMethod(GuiBitmapItemExtended, setForceGlow, void, (bool enabled), ,
+   "@brief Force the glow outline to be on, even if not hovered or selected.\n"
+   "This allows the control to be highlighted via script.\n"
+   "@param enabled True to force glow, false to return to normal behavior."
+)
+{
+   object->setForceGlow(enabled);
+}
+void GuiBitmapItemExtended::setForceGlow(bool enabled)
+{
+   mForceGlow = enabled;
+   setUpdate();
+}
+
+//-----------------------------------------------------------------------------
+// Asset refresh for frame and glow bitmaps
+//-----------------------------------------------------------------------------
+void GuiBitmapItemExtended::onFrameAssetRefresh()
+{
+   if (mBitmapFrameAsset.notNull() && mBitmapFrameAsset->getStatus() == ImageAsset::Ok)
+      mBitmapFrame = mBitmapFrameAsset->getTexture(&GFXDefaultGUIProfile);
+   else
+      mBitmapFrame = GFXTexHandle();
+   setUpdate();
+}
+void GuiBitmapItemExtended::onGlowAssetRefresh()
+{
+   if (mBitmapGlowAsset.notNull() && mBitmapGlowAsset->getStatus() == ImageAsset::Ok)
+      mBitmapGlow = mBitmapGlowAsset->getTexture(&GFXDefaultGUIProfile);
+   else
+      mBitmapGlow = GFXTexHandle();
+   setUpdate();
+}
+
+//-----------------------------------------------------------------------------
+// Icon asset pattern
 //-----------------------------------------------------------------------------
 bool GuiBitmapItemExtended::_setBitmapAsset(void* obj, const char* index, const char* data)
 {
@@ -36,19 +150,11 @@ bool GuiBitmapItemExtended::_setBitmapAsset(void* obj, const char* index, const 
    ctrl->setUpdate();
    return false;
 }
-
-//-----------------------------------------------------------------------------
-// _getBitmapAsset
-//-----------------------------------------------------------------------------
 const char* GuiBitmapItemExtended::_getBitmapAsset(void* obj, const char* data)
 {
    GuiBitmapItemExtended* ctrl = static_cast<GuiBitmapItemExtended*>(obj);
    return ctrl->mBitmapAsset.notNull() ? ctrl->mBitmapAsset->getAssetId() : StringTable->EmptyString();
 }
-
-//-----------------------------------------------------------------------------
-// onAssetRefresh
-//-----------------------------------------------------------------------------
 void GuiBitmapItemExtended::onAssetRefresh()
 {
    if (mBitmapAsset.notNull() && mBitmapAsset->getStatus() == ImageAsset::Ok)
@@ -62,16 +168,38 @@ void GuiBitmapItemExtended::onAssetRefresh()
 // Constructor
 //-----------------------------------------------------------------------------
 GuiBitmapItemExtended::GuiBitmapItemExtended()
-   : mBitmapAsset(nullptr), mBitmap(nullptr),
-   mColor(255, 255, 255, 255), mAngle(0.0f),
-   mDrawBackgroundRect(false), mBackgroundColor(0, 0, 0, 150),
-   mBitmapShadow(false), mBitmapShadowColor(0, 0, 0, 128), mBitmapShadowOffset(2, 2),
-   mTitle(nullptr), mBottomLeftText(nullptr), mBottomRightText(nullptr),
-   mProgress(0.0f), mBarColor(0, 200, 0, 255), mTextColor(255, 255, 255, 255),
-   mDrawTextFrame(false), mTextFrameColor(0, 0, 0, 150), mTextFramePadding(2),
+   : mBitmapAsset(nullptr),
+   mBitmap(nullptr),
+   mBitmapFrameAsset(nullptr),
+   mBitmapFrame(nullptr),
+   mBitmapGlowAsset(nullptr),
+   mBitmapGlow(nullptr),
+   mUseBitmapFrame(false),
+   mUseBitmapGlow(false),
+   mColor(255, 255, 255, 255),
+   mAngle(0.0f),
+   mDrawBackgroundRect(true),
+   mBackgroundColor(255, 255, 255, 255),
+   mBitmapShadow(true),
+   mBitmapShadowColor(0, 0, 0, 192),
+   mBitmapShadowOffset(2, 2),
+   mTitle(nullptr),
+   mBottomLeftText(nullptr),
+   mBottomRightText(nullptr),
+   mProgress(0.0f),
+   mBarColor(0, 200, 0, 255),
+   mTextColor(255, 255, 255, 255),
+   mDrawTextFrame(true),
+   mTextFrameColor(0, 0, 0, 192),
+   mTextFramePadding(1),
    mFontName(StringTable->insert("Roboto Condensed")),
-   mFontSize(18),
-   mCustomFont(nullptr)
+   mFontSize(20),
+   mCustomFont(nullptr),
+   mGlowEnabled(true),
+   mGlowColor(255, 255, 0, 255),
+   mGlowThickness(4),
+   mHovering(false),
+   mForceGlow(false)
 {
    mTitle = StringTable->insert("");
    mBottomLeftText = StringTable->insert("");
@@ -81,7 +209,7 @@ GuiBitmapItemExtended::GuiBitmapItemExtended()
 }
 
 //-----------------------------------------------------------------------------
-// initPersistFields
+// Persist fields for assets
 //-----------------------------------------------------------------------------
 void GuiBitmapItemExtended::initPersistFields()
 {
@@ -97,6 +225,13 @@ void GuiBitmapItemExtended::initPersistFields()
    addField("bitmapShadow", TypeBool, Offset(mBitmapShadow, GuiBitmapItemExtended), "Enable drop shadow");
    addField("bitmapShadowColor", TypeColorI, Offset(mBitmapShadowColor, GuiBitmapItemExtended), "Shadow color");
    addField("bitmapShadowOffset", TypePoint2I, Offset(mBitmapShadowOffset, GuiBitmapItemExtended), "Shadow offset");
+
+   addProtectedField("bitmapFrameAsset", TypeImageAssetPtr, Offset(mBitmapFrameAsset, GuiBitmapItemExtended),
+      &GuiBitmapItemExtended::_setBitmapFrameAsset, &GuiBitmapItemExtended::_getBitmapFrameAsset, "Image asset ID for frame");
+   addProtectedField("bitmapGlowAsset", TypeImageAssetPtr, Offset(mBitmapGlowAsset, GuiBitmapItemExtended),
+      &GuiBitmapItemExtended::_setBitmapGlowAsset, &GuiBitmapItemExtended::_getBitmapGlowAsset, "Image asset ID for glow");
+   addField("useBitmapFrame", TypeBool, Offset(mUseBitmapFrame, GuiBitmapItemExtended), "Use bitmap frame asset");
+   addField("useBitmapGlow", TypeBool, Offset(mUseBitmapGlow, GuiBitmapItemExtended), "Use bitmap glow asset");
    endGroup("BitmapItem");
 
    addGroup("Overlay");
@@ -111,10 +246,59 @@ void GuiBitmapItemExtended::initPersistFields()
    addField("textFramePadding", TypeS32, Offset(mTextFramePadding, GuiBitmapItemExtended), "Text frame padding");
    endGroup("Overlay");
 
+   addGroup("Glow");
+   addField("glowEnabled", TypeBool, Offset(mGlowEnabled, GuiBitmapItemExtended),
+      "Enable glow outline on hover or focus");
+   addField("glowColor", TypeColorI, Offset(mGlowColor, GuiBitmapItemExtended),
+      "Glow outline color");
+   addField("glowThickness", TypeS32, Offset(mGlowThickness, GuiBitmapItemExtended),
+      "Glow outline thickness in pixels");
+   addField(sForceGlowFieldName, TypeBool, Offset(mForceGlow, GuiBitmapItemExtended),
+      "Force the glow outline even if not hovered or selected");
+   endGroup("Glow");
+
    addGroup("Font");
    addField("fontName", TypeCaseString, Offset(mFontName, GuiBitmapItemExtended), "Font face name");
    addField("fontSize", TypeS32, Offset(mFontSize, GuiBitmapItemExtended), "Font size");
    endGroup("Font");
+}
+
+//-----------------------------------------------------------------------------
+// Mouse events
+//-----------------------------------------------------------------------------
+void GuiBitmapItemExtended::onMouseDragged(const GuiEvent& event)
+{
+   onMouseDragged_callback();
+   Parent::onMouseDragged(event);
+}
+void GuiBitmapItemExtended::onMouseUp(const GuiEvent& event)
+{
+   Parent::onMouseUp(event);
+   onMouseUp_callback();
+}
+void GuiBitmapItemExtended::onMouseEnter(const GuiEvent& event)
+{
+   Parent::onMouseEnter(event);
+   mHovering = true;
+   setUpdate();
+   onMouseEnter_callback();
+}
+void GuiBitmapItemExtended::onMouseLeave(const GuiEvent& event)
+{
+   Parent::onMouseLeave(event);
+   mHovering = false;
+   setUpdate();
+   onMouseLeave_callback();
+}
+void GuiBitmapItemExtended::onGainFirstResponder()
+{
+   Parent::onGainFirstResponder();
+   setUpdate();
+}
+void GuiBitmapItemExtended::onLoseFirstResponder()
+{
+   Parent::onLoseFirstResponder();
+   setUpdate();
 }
 
 //-----------------------------------------------------------------------------
@@ -133,11 +317,17 @@ bool GuiBitmapItemExtended::onWake()
 {
    if (!Parent::onWake()) return false;
    setActive(true);
+
    // load bitmap
    if (mBitmapAsset.notNull() && mBitmapAsset->getStatus() == ImageAsset::Ok)
       mBitmap = mBitmapAsset->getTexture(&GFXDefaultGUIProfile);
 
-   // refresh font now
+   if (mBitmapFrameAsset.notNull() && mBitmapFrameAsset->getStatus() == ImageAsset::Ok)
+      mBitmapFrame = mBitmapFrameAsset->getTexture(&GFXDefaultGUIProfile);
+
+   if (mBitmapGlowAsset.notNull() && mBitmapGlowAsset->getStatus() == ImageAsset::Ok)
+      mBitmapGlow = mBitmapGlowAsset->getTexture(&GFXDefaultGUIProfile);
+
    refreshFont();
    return true;
 }
@@ -162,46 +352,63 @@ void GuiBitmapItemExtended::refreshFont()
 //-----------------------------------------------------------------------------
 void GuiBitmapItemExtended::onRender(Point2I offset, const RectI& updateRect)
 {
-   // early out
    Point2I ext = getExtent();
    if (ext.x <= 0 || ext.y <= 0 || !mProfile) return;
 
-   // square
-   S32 size = ext.x < ext.y ? ext.x : ext.y;
-   RectI bounds(offset, Point2I(size, size));
-   GFXDrawUtil* du = GFX->getDrawUtil();
+   S32 framePad = mGlowThickness;
+   S32 frameSize = (ext.x < ext.y ? ext.x : ext.y);
+   RectI frameRect(offset, Point2I(frameSize, frameSize));
+   RectI contentRect = frameRect;
+   contentRect.inset(framePad, framePad);
 
-   // reset
+   GFXDrawUtil* du = GFX->getDrawUtil();
    du->clearBitmapModulation();
    ColorI prevMod; du->getBitmapModulation(&prevMod);
 
-   // shadow
+   // 1. Draw frame (bitmap or drawn)
+   if (mDrawBackgroundRect)
+   {
+      if (mUseBitmapFrame && mBitmapFrame.isValid())
+      {
+         du->setBitmapModulation(mBackgroundColor);
+         du->drawBitmapStretch(mBitmapFrame, frameRect, GFXBitmapFlip_None, GFXTextureFilterLinear, false);
+         du->setBitmapModulation(prevMod);
+      }
+      else
+      {
+         du->setBitmapModulation(ColorI(0, 0, 0, 0));
+         du->drawRoundedRect(4.0f, frameRect, ColorI(0, 0, 0, 0), 0.0f, ColorI(0, 0, 0, 0));
+         du->setBitmapModulation(prevMod);
+      }
+   }
+
+   // 2. Draw shadow
    if (mBitmapShadow && mBitmap.isValid())
    {
       du->setBitmapModulation(mBitmapShadowColor);
-      RectI sh = bounds; sh.point += mBitmapShadowOffset; sh.inset(2, 2);
+      RectI sh = contentRect; sh.point += mBitmapShadowOffset; sh.inset(2, 2);
       du->drawBitmapStretch(mBitmap, sh, GFXBitmapFlip_None, GFXTextureFilterLinear, false, mAngle);
       du->setBitmapModulation(prevMod);
    }
 
-   // background
-   if (mDrawBackgroundRect)
+   // 3. Draw background rectangle (inside content area)
+   if (mDrawBackgroundRect && (!mUseBitmapFrame || !mBitmapFrame.isValid()))
    {
       du->setBitmapModulation(mBackgroundColor);
-      du->drawRoundedRect(4.0f, bounds, mBackgroundColor, 2.0f, mBackgroundColor);
+      du->drawRoundedRect(4.0f, contentRect, mBackgroundColor, 2.0f, mBackgroundColor);
       du->setBitmapModulation(prevMod);
    }
 
-   // bitmap
+   // 4. Draw bitmap (inside content area)
    if (mBitmap.isValid())
    {
       du->setBitmapModulation(mColor);
-      RectI tr = bounds; tr.inset(2, 2);
+      RectI tr = contentRect; tr.inset(2, 2);
       du->drawBitmapStretch(mBitmap, tr, GFXBitmapFlip_None, GFXTextureFilterLinear, false, mAngle);
       du->setBitmapModulation(prevMod);
    }
 
-   // overlay
+   // 5. Overlay text (inside content area)
    GFont* font = mCustomFont ? mCustomFont : mProfile->mFont;
    if (font)
    {
@@ -220,16 +427,16 @@ void GuiBitmapItemExtended::onRender(Point2I offset, const RectI& updateRect)
          };
 
       if (mTitle && mTitle[0])
-         drawLabel(mTitle, bounds.point + Point2I((size - font->getStrWidth(mTitle)) / 2, 4));
+         drawLabel(mTitle, contentRect.point + Point2I((contentRect.extent.x - font->getStrWidth(mTitle)) / 2, 4));
       if (mBottomLeftText && mBottomLeftText[0])
-         drawLabel(mBottomLeftText, bounds.point + Point2I(4, size - font->getHeight() - 8));
+         drawLabel(mBottomLeftText, contentRect.point + Point2I(4, contentRect.extent.y - font->getHeight() - 8));
       if (mBottomRightText && mBottomRightText[0])
-         drawLabel(mBottomRightText, bounds.point + Point2I(size - font->getStrWidth(mBottomRightText) - 4, size - font->getHeight() - 8));
+         drawLabel(mBottomRightText, contentRect.point + Point2I(contentRect.extent.x - font->getStrWidth(mBottomRightText) - 4, contentRect.extent.y - font->getHeight() - 8));
 
-      // progress
+      // progress bar
       S32 barH = 6, margin = 16;
-      S32 barY = size - font->getHeight() - 8 + margin;
-      RectI bg(bounds.point + Point2I(4, barY), Point2I(size - 8, barH));
+      S32 barY = contentRect.extent.y - font->getHeight() - 8 + margin;
+      RectI bg(contentRect.point + Point2I(4, barY), Point2I(contentRect.extent.x - 8, barH));
       du->setBitmapModulation(prevMod);
       du->drawRoundedRect(2.0f, bg, ColorI(40, 40, 40, 150), 2.0f, ColorI(40, 40, 40, 150));
       if (mProgress > 0.0f)
@@ -240,16 +447,36 @@ void GuiBitmapItemExtended::onRender(Point2I offset, const RectI& updateRect)
       }
    }
 
+   // 6. Glow border (bitmap or drawn)
+   bool mouseEnabled = true;
+   GuiCanvas* canvas = dynamic_cast<GuiCanvas*>(getRoot());
+   if (canvas)
+      mouseEnabled = canvas->isCursorON();
+
+   if (mGlowEnabled && ((mouseEnabled && (mHovering || isFirstResponder())) || mForceGlow))
+   {
+      ColorI savedMod;
+      du->getBitmapModulation(&savedMod);
+      du->setBitmapModulation(mGlowColor);
+
+      if (mUseBitmapGlow && mBitmapGlow.isValid())
+      {
+         du->drawBitmapStretch(mBitmapGlow, frameRect, GFXBitmapFlip_None, GFXTextureFilterLinear, false);
+         du->setBitmapModulation(savedMod);
+      }
+      else
+      {
+         du->drawRoundedRect(
+            4.0f,
+            frameRect,
+            ColorI(0, 0, 0, 0),
+            (F32)(2 * mGlowThickness),
+            mGlowColor
+         );
+         du->setBitmapModulation(savedMod);
+      }
+   }
+
    du->setBitmapModulation(prevMod);
    renderChildControls(offset, updateRect);
 }
-
-void GuiBitmapItemExtended::onMouseDragged(const GuiEvent& event)
-{
-   Parent::onMouseDragged(event);
-}
-
-IMPLEMENT_CALLBACK(GuiBitmapItemExtended, onMouseDragged, void, (), (),
-   "If #useMouseEvents is true, this is called when a left mouse button drag is detected, i.e. when the user "
-   "pressed the left mouse button on the control and then moves the mouse over a certain distance threshold with "
-   "the mouse button still pressed.");

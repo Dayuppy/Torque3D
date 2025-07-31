@@ -11,7 +11,6 @@
 #include "gfx/gfxDrawUtil.h"
 #include "gfx/gFont.h"
 
-
 class GuiBitmapItemExtended : public GuiControl
 {
    typedef GuiControl Parent;
@@ -20,14 +19,46 @@ public:
    GuiBitmapItemExtended();
    virtual ~GuiBitmapItemExtended() {}
 
-   DECLARE_CONOBJECT(GuiBitmapItemExtended);
-   DECLARE_CALLBACK(void, onMouseDragged, ());
    static void initPersistFields();
 
+   void setForceGlow(bool enabled);
+
+   DECLARE_CONOBJECT(GuiBitmapItemExtended);
+   DECLARE_CALLBACK(void, onMouseDragged, ());
+   DECLARE_CALLBACK(void, onMouseUp, ());
+   DECLARE_CALLBACK(void, onMouseEnter, ());
+   DECLARE_CALLBACK(void, onMouseLeave, ());
+
 protected:
-   // Asset & texture
+   // Icon Asset & texture
    AssetPtr<ImageAsset> mBitmapAsset;
    GFXTexHandle         mBitmap;
+
+   // Frame Asset & texture
+   AssetPtr<ImageAsset> mBitmapFrameAsset;
+   GFXTexHandle         mBitmapFrame;
+
+   // Glow Asset & texture
+   AssetPtr<ImageAsset> mBitmapGlowAsset;
+   GFXTexHandle         mBitmapGlow;
+
+   bool mUseBitmapFrame;
+   bool mUseBitmapGlow;
+
+   // Asset reload handlers
+   void onAssetRefresh();
+   void onFrameAssetRefresh();
+   void onGlowAssetRefresh();
+
+   // Asset field handlers (for persistence)
+   static bool        _setBitmapAsset(void* obj, const char* index, const char* data);
+   static const char* _getBitmapAsset(void* obj, const char* data);
+
+   static bool        _setBitmapFrameAsset(void* obj, const char* index, const char* data);
+   static const char* _getBitmapFrameAsset(void* obj, const char* data);
+
+   static bool        _setBitmapGlowAsset(void* obj, const char* index, const char* data);
+   static const char* _getBitmapGlowAsset(void* obj, const char* data);
 
    // Visual options
    ColorI               mColor;               ///< Tint & alpha
@@ -54,19 +85,30 @@ protected:
    S32                  mFontSize;
    Resource<GFont>      mCustomFont;
 
-   // Field handlers
-   static bool        _setBitmapAsset(void* obj, const char* index, const char* data);
-   static const char* _getBitmapAsset(void* obj, const char* data);
+   // Glow outline on hover or focus
+   bool    mGlowEnabled;
+   ColorI  mGlowColor;
+   S32     mGlowThickness;
+   bool    mHovering;
+   bool    mForceGlow;
 
-   // Asset reload callback
-   void onAssetRefresh();
-
-   // Refresh custom font
+   // Font refresh
    void refreshFont();
 
    // GuiControl overrides
    bool onAdd() override;
    bool onWake() override;
-   void onRender(Point2I offset, const RectI& updateRect) override;
-   void onMouseDragged(const GuiEvent& event) override;
+
+   virtual void onRender(Point2I offset, const RectI& updateRect) override;
+
+   virtual void onMouseDragged(const GuiEvent& event) override;
+   virtual void onMouseUp(const GuiEvent&) override;
+   virtual void onMouseEnter(const GuiEvent&) override;
+   virtual void onMouseLeave(const GuiEvent&) override;
+
+   /// Called when this control gains keyboard focus
+   virtual void onGainFirstResponder() override;
+
+   /// Called when this control loses keyboard focus
+   virtual void onLoseFirstResponder() override;
 };

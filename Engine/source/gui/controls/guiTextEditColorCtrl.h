@@ -28,12 +28,12 @@ protected:
    S32 mFontSize;
    ColorI mFontColor;
    bool mWordWrap;
+   bool mDrawFrame;
+   ColorI mFrameColor;
+   ColorI mPlaceholderColor;
+   bool mContainerOpaque;
 
    Resource<GFont> mCustomFont;
-
-   void drawTextWithOutline(GFont* font, const Point2I& pos, const char* text,
-      const ColorI& textColor, const ColorI& outlineColor,
-      S32 thickness);
 
 public:
    GuiTextEditColorCtrl();
@@ -41,8 +41,12 @@ public:
    DECLARE_CONOBJECT(GuiTextEditColorCtrl);
    static void initPersistFields();
 
-   bool onWake() override;
-   void onRender(Point2I offset, const RectI& updateRect) override;
+   virtual bool onWake() override;
+   virtual void onRender(Point2I offset, const RectI& updateRect) override;
+   virtual void onMouseDown(const GuiEvent& event) override;
+   virtual void drawText(const RectI& drawRect, bool isFocused) override;
+   virtual void onStaticModified(const char* slotName, const char* newValue = NULL) override;
+   virtual GuiControl* findHitControl(const Point2I& pt, S32 initialLayer) override;
 
    void refreshFont();
 };

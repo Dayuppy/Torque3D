@@ -28,10 +28,6 @@ protected:
    bool mWordWrap;
    Resource<GFont> mCustomFont;
 
-   void drawTextWithOutline(GFont* font, const Point2I& pos, const char* text,
-      const ColorI& textColor, const ColorI& outlineColor,
-      S32 thickness);
-
 public:
    GuiTextColorCtrl();
 

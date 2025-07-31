@@ -284,6 +284,8 @@ class GuiControl : public SimGroup
       DECLARE_CALLBACK( void, onControlDragExit, ( GuiControl* control, const Point2I& dropPoint ) );
       DECLARE_CALLBACK( void, onControlDragged, ( GuiControl* control, const Point2I& dropPoint ) );
       DECLARE_CALLBACK( void, onControlDropped, ( GuiControl* control, const Point2I& dropPoint ) );
+
+      DECLARE_CALLBACK(void, onRightMouseDown, (const S32& x, const S32& y));
             
       /// @}
       
