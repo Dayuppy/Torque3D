@@ -483,3 +483,73 @@ DefineEngineFunction(mAngToEul, EulerF, (AngAxisF angAx), , "convert degrees to 
 {
    return mAngToEul(angAx);
 }
+//-----------------------------------------------------------------------------
+// dec-string ? hex-string
+// Torque 3D - exposed to script as mDecStrToHex( <decimalString> )
+//
+//   mDecStrToHex("255")   ?  "FF"
+//   mDecStrToHex("65535") ?  "FFFF"
+//-----------------------------------------------------------------------------
+
+DefineEngineFunction(
+   mDecStrToHex,         // function name visible in script
+   const char*,          // C++ return type
+   (const char* decStr), // arguments
+   ,                      // default argument list (none)
+   "Convert a decimal number (supplied as a string) to its hexadecimal "
+   "representation.  The result is returned as an uppercase string without "
+   "a leading 0x.\n"
+   "@param decStr Decimal number, e.g. \"43981\"\n"
+   "@return      Hexadecimal text, e.g. \"ABCD\""
+)
+{
+   // --- 1.  Parse the input -------------------------------------------------
+   //     We accept optional leading whitespace and ± sign.
+   //     strtoull() is part of the C standard library and available on every
+   //     platform Torque supports.
+   char* endPtr = nullptr;
+   errno = 0;
+   U64 value = strtoull(decStr, &endPtr, 10);
+
+   // Basic sanity check: at least one digit must have been consumed.
+   // You can change this to Con::errorf() or Con::warnf() if you prefer.
+   if (endPtr == decStr || errno == ERANGE)
+      return StringTable->insert("0");
+
+   // --- 2.  Format as hexadecimal ------------------------------------------
+   // Up to 16 hex digits for 64-bit numbers, plus one byte for NUL.
+   // Con::getReturnBuffer() guarantees persistence until the next console
+   // call on this thread.
+   char* ret = Con::getReturnBuffer(/*size=*/17);
+   dSprintf(ret, 17, "%llX", value);   // always uppercase, no leading 0x
+
+   return ret;
+}
+
+DefineEngineFunction(
+   mHexAddOneStr,
+   const char*,                 // return type
+   (const char* hexStr),        // input
+   ,
+   "Add one to a hexadecimal number given as a string. "
+   "Returns a hex string with no leading 0x and in uppercase.\n"
+   "@param hexStr A hexadecimal string like \"FF\" or \"1A3\"\n"
+   "@return       The result of (input + 1), e.g., \"100\" or \"1A4\""
+)
+{
+   // --- 1. Parse hex string into 64-bit number ------------------------------
+   char* endPtr = nullptr;
+   errno = 0;
+   U64 value = strtoull(hexStr, &endPtr, 16);  // base 16 for hex input
+
+   if (endPtr == hexStr || errno == ERANGE)
+      return StringTable->insert("0"); // treat invalid input as 0
+
+   value += 1;  // add one
+
+   // --- 2. Format back to hex string ---------------------------------------
+   char* ret = Con::getReturnBuffer(17);  // enough for 64-bit hex + null
+   dSprintf(ret, 17, "%llX", value);      // uppercase, no "0x"
+
+   return ret;
+}

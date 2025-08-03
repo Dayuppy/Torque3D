@@ -950,7 +950,15 @@ ShapeBase::ShapeBase()
    mConvexList( new Convex ),
    mEnergy( 0.0f ),
    mRechargeRate( 0.0f ),
+   mBattery(4000.0f),
+   maxBattery(8000.0f),
    mMass( 1.0f ),
+   mTeam(0),//dark
+   mForceField(0),//dark
+   mSensorNum(0),
+   mIconVisDis(500),
+   mShapeIconHandle(StringTable->EmptyString()),
+   mIconColor(1, 1, 1, 1),
    mOneOverMass( 1.0f ),
    mDrag( 0.0f ),
    mBuoyancy( 0.0f ),
@@ -964,7 +972,9 @@ ShapeBase::ShapeBase()
    mTimeoutList( NULL ),
    mDamage( 0.0f ),
    mRepairRate( 0.0f ),
+   BatteryRate(1.0f),
    mRepairReserve( 0.0f ),
+   mBatteryReserve(0.0f),
    mDamageState( Enabled ),
    mDamageThread( NULL ),
    mHulkThread( NULL ),
@@ -1067,7 +1077,12 @@ void ShapeBase::initPersistFields()
    addField( "isAiControlled", TypeBool, Offset(mIsAiControlled, ShapeBase),
       "@brief Is this object AI controlled.\n\n"
       "If True then this object is considered AI controlled and not player controlled.\n" );
-
+   addField("maxBattery", TypeF32, Offset(maxBattery, ShapeBase),
+	   "Rate at which damage is repaired in damage units/tick.\n"
+	   "This value is subtracted from the damage level until it reaches 0.");
+   addField("BatteryRate", TypeF32, Offset(BatteryRate, ShapeBase),
+	   "Rate at which damage is repaired in damage units/tick.\n"
+	   "This value is subtracted from the damage level until it reaches 0.");
    Parent::initPersistFields();
 }
 
@@ -1305,10 +1320,17 @@ bool ShapeBase::onNewDataBlock( GameBaseData *dptr, bool reload )
    }
 
    //
+   mTeam = 0;//dark
+   mForceField = 0;//dark
+   mSensorNum = 0;
+   mIconVisDis = 500;
+   mIconColor.set(1, 1, 1, 1);
+
    mEnergy = 0;
    mDamage = 0;
    mDamageState = Enabled;
    mRepairReserve = 0;
+   mBatteryReserve = 0;
    updateMass();
    updateDamageLevel();
    updateDamageState();
@@ -1359,19 +1381,37 @@ void ShapeBase::processTick(const Move* move)
    PROFILE_SCOPE( ShapeBase_ProcessTick );
 
    // Energy management
-   if (mDamageState == Enabled && mDataBlock->inheritEnergyFromMount == false) {
+   if (mDamageState == Enabled && !mDataBlock->inheritEnergyFromMount)
+   {
       F32 store = mEnergy;
-      mEnergy += mRechargeRate;
-      if (mEnergy > mDataBlock->maxEnergy)
-         mEnergy = mDataBlock->maxEnergy;
-      else
+
+      if (mEnergy < mDataBlock->maxEnergy)
+      {
+         F32 recharge = getMin(mRechargeRate, mBattery);
+         mEnergy = getMin(mEnergy + recharge, mDataBlock->maxEnergy);
+         mBattery -= recharge;
+      }
+
+      // Clamp energy
          if (mEnergy < 0)
             mEnergy = 0;
 
-      // Virtual setEnergyLevel is used here by some derived classes to
-      // decide whether they really want to set the energy mask bit.
+      // Clamp battery
+      if (mBattery < 0)
+         mBattery = 0;
+      else if (mBattery > maxBattery)
+         mBattery = maxBattery;
+
       if (mEnergy != store)
          setEnergyLevel(mEnergy);
+
+      // Recharge battery from reserve
+      if (mBatteryReserve > 0)
+      {
+         F32 refill = getMin(getMin(BatteryRate, mBatteryReserve), maxBattery - mBattery);
+         mBattery += refill;
+         mBatteryReserve -= refill;
+      }
    }
 
    // Repair management
@@ -1668,7 +1708,10 @@ F32 ShapeBase::getEnergyLevel()
       return mShapeBaseMount->getEnergyLevel();
    return mEnergy; 
 }
-
+F32 ShapeBase::getBatteryLevel()
+{
+	return mBattery;
+}
 F32 ShapeBase::getEnergyValue()
 {
    if ( mDataBlock->inheritEnergyFromMount && mShapeBaseMount )
@@ -1686,7 +1729,12 @@ F32 ShapeBase::getEnergyValue()
 
    return 0.0f;
 }
-
+F32 ShapeBase::getBatteryValue()
+{
+		if (maxBattery > 0)
+			return (mBattery / maxBattery);
+	return 0;
+}
 void ShapeBase::setEnergyLevel(F32 energy)
 {
    if (mDataBlock->inheritEnergyFromMount == false || !mShapeBaseMount) {
@@ -1702,7 +1750,13 @@ void ShapeBase::setEnergyLevel(F32 energy)
       }
    }
 }
-
+void ShapeBase::setBatteryLevel(F32 energy)
+{
+		if (mDamageState == Enabled) {
+			mBattery = (energy > maxBattery) ?
+				maxBattery : (energy < 0) ? 0 : energy;
+		}
+}
 void ShapeBase::setDamageLevel(F32 damage)
 {
    if (!mDataBlock->isInvincible) {
@@ -1772,7 +1826,13 @@ void ShapeBase::applyRepair(F32 amount)
    if (amount > 0 && ((mRepairReserve += amount) > mDamage))
       mRepairReserve = mDamage;
 }
-
+void ShapeBase::applyBattery(F32 amount)
+{
+	if (amount > 0 && (amount + mBatteryReserve + mBattery) < maxBattery)
+		mBatteryReserve += amount;
+	else if (mBattery < maxBattery)
+		mBatteryReserve += maxBattery - mBattery;
+}
 void ShapeBase::applyDamage(F32 amount)
 {
    if (amount > 0)
@@ -3098,6 +3158,8 @@ void ShapeBase::writePacketData(GameConnection *connection, BitStream *stream)
 
    stream->write(getEnergyLevel());
    stream->write(mRechargeRate);
+   stream->write(mBattery);
+   stream->write(maxBattery);
 }
 
 void ShapeBase::readPacketData(GameConnection *connection, BitStream *stream)
@@ -3109,6 +3171,8 @@ void ShapeBase::readPacketData(GameConnection *connection, BitStream *stream)
    setEnergyLevel(energy);
 
    stream->read(&mRechargeRate);
+   stream->read(&mBattery);
+   stream->read(&maxBattery);
 }
 
 F32 ShapeBase::getUpdatePriority(CameraScopeQuery *camInfo, U32 updateMask, S32 updateSkips)
@@ -3152,7 +3216,7 @@ U32 ShapeBase::packUpdate(NetConnection *con, U32 mask, BitStream *stream)
             mask &= ~(ImageMaskN << i);
    }
 
-   if(!stream->writeFlag(mask & (NameMask | DamageMask | SoundMask | MeshHiddenMask |
+   if(!stream->writeFlag(mask & (NameMask | SensorMask | DamageMask | SoundMask | MeshHiddenMask |
          ThreadMask | ImageMask | CloakMask | SkinMask)))
       return retMask;
 
@@ -3244,7 +3308,14 @@ U32 ShapeBase::packUpdate(NetConnection *con, U32 mask, BitStream *stream)
             stream->writeFlag(mFadeVal == 1.0f);
       }
       if (stream->writeFlag(mask & NameMask)) {
+         stream->write(mTeam);//dark
+         stream->writeFlag(mForceField);
          con->packNetStringHandleU(stream, mShapeNameHandle);
+      }
+      if (stream->writeFlag(mask & SensorMask)) {
+         stream->write(mSensorNum);//dark
+         stream->write(mIconVisDis);
+         stream->write(mIconColor);
       }
 
       if ( stream->writeFlag( mask & MeshHiddenMask ) )
@@ -3460,9 +3531,15 @@ void ShapeBase::unpackUpdate(NetConnection *con, BitStream *stream)
             mFadeVal = F32(stream->readFlag());
       }
       if (stream->readFlag())  { // NameMask
+         stream->read(&mTeam);//dark
+         mForceField = stream->readFlag();
          mShapeNameHandle = con->unpackNetStringHandleU(stream);
       }
-      
+      if (stream->readFlag()) { // SensorMask
+         stream->read(&mSensorNum);
+         stream->read(&mIconVisDis);
+         stream->read(&mIconColor);
+      }
       if ( stream->readFlag() ) // MeshHiddenMask
       {
          stream->readBits( &mMeshHidden );
@@ -3697,6 +3774,24 @@ void ShapeBase::startFade( F32 fadeTime, F32 fadeDelay, bool fadeOut )
 }
 
 //--------------------------------------------------------------------------
+void ShapeBase::setShapeIcon(const char* name) {//dark
+   if (!isGhost()) {
+      if (name[0] != '\0') {
+         // Use tags for better network performance
+         // Should be a tag, but we'll convert to one if it isn't.
+         if (name[0] == StringTagPrefixByte) {
+            mShapeIconHandle = NetStringHandle(U32(dAtoi(name + 1)));
+         }
+         else {
+            mShapeIconHandle = NetStringHandle(name);
+         }
+      }
+      else {
+         mShapeIconHandle = NetStringHandle();
+      }
+      setMaskBits(NameMask);
+   }
+}
 
 void ShapeBase::setShapeName(const char* name)
 {
@@ -4550,7 +4645,16 @@ DefineEngineMethod( ShapeBase, setEnergyLevel, void, ( F32 level ),,
 {
    object->setEnergyLevel( level );
 }
+DefineEngineMethod(ShapeBase, setBatteryLevel, void, (F32 level), ,
+	"@brief Set this object's current energy level.\n\n"
 
+	"@param level new energy level\n"
+
+	"@see getEnergyLevel()\n"
+	"@see getEnergyPercent()\n")
+{
+	object->setBatteryLevel(level);
+}
 DefineEngineMethod( ShapeBase, getEnergyLevel, F32, (),,
    "@brief Get the object's current energy level.\n\n"
 
@@ -4560,7 +4664,15 @@ DefineEngineMethod( ShapeBase, getEnergyLevel, F32, (),,
 {
    return object->getEnergyLevel();
 }
+DefineEngineMethod(ShapeBase, getBatteryLevel, F32, (), ,
+	"@brief Get the object's current energy level.\n\n"
 
+	"@return energy level\n"
+
+	"@see setEnergyLevel()\n")
+{
+	return object->getBatteryLevel();
+}
 DefineEngineMethod( ShapeBase, getEnergyPercent, F32, (),,
    "@brief Get the object's current energy level as a percentage of maxEnergy.\n\n"
    "@return energyLevel / datablock.maxEnergy\n"
@@ -4685,6 +4797,11 @@ DefineEngineMethod( ShapeBase, applyRepair, void, ( F32 amount ),,
 {
    object->applyRepair( amount );
 }
+DefineEngineMethod(ShapeBase, applyBattery, void, (F32 amount), ,
+	"@Apply Battery at this amount.\n\n")
+{
+	object->applyBattery(amount);
+}
 
 DefineEngineMethod( ShapeBase, setRepairRate, void, ( F32 rate ),,
    "@brief Set amount to repair damage by each tick.\n\n"
@@ -4702,7 +4819,13 @@ DefineEngineMethod( ShapeBase, setRepairRate, void, ( F32 rate ),,
       rate = 0;
    object->setRepairRate( rate );
 }
-
+DefineEngineMethod(ShapeBase, setBatteryRate, void, (F32 rate), ,
+	"@Battery\n\n")
+{
+	if (rate < 0)
+		rate = 0;
+	object->setBatteryRate(rate);
+}
 DefineEngineMethod( ShapeBase, getRepairRate, F32, (),,
    "@brief Get the per-tick repair amount.\n\n"
 
@@ -5449,4 +5572,66 @@ DefineEngineMethod(ShapeBase, getNodePoint, Point3F, (const char* nodeName), ,
    object->getNodePoint(nodeName, &pos);
 
    return pos;
+}
+
+DefineEngineMethod(ShapeBase, setShapeIcon, void, (const char* name), ,//dark
+   "@brief Set the icon name of this shape.\n\n"
+   "@note This is used by the Advanced Radar GUI, use \t to separate specialcases(IE: Players).\n"
+   "@param name new icon name for the shape\n\n"
+   "@see getShapeIcon()\n")
+{
+   object->setShapeIcon(name);
+}
+DefineEngineMethod(ShapeBase, getShapeIcon, const char*, (), ,//dark
+   "@brief Get the name of the shape.\n\n"
+   "@note This is used by the Advanced Radar GUI, use \t to separate specialcases(IE: Players).\n"
+   "@return the icon name of the shape\n\n"
+   "@see setShapeIcon()\n")
+{
+   return object->getShapeIcon();
+}
+
+DefineEngineMethod(ShapeBase, getTeam, S32, (), ,//dark
+   "@brief Get the current team number used by this shape.\n\n"
+   "@return the team number\n\n") {
+   return object->getTeam();
+}
+DefineEngineMethod(ShapeBase, setTeam, void, (S32 newTeam), ,//dark
+   "@brief Set the current team number of this shape.\n\n"
+   "@return void\n\n") {
+   object->setTeam(newTeam);
+}
+DefineEngineMethod(ShapeBase, getSensor, S32, (), ,//dark
+   "@brief Get the current team number used by this shape.\n\n"
+   "@return the team number\n\n") {
+   return object->getSensor();
+}
+DefineEngineMethod(ShapeBase, setSensor, void, (S32 newSensor), ,//dark
+   "@brief Set the current team number of this shape.\n\n"
+   "@return void\n\n") {
+   object->setSensor(newSensor);
+}
+
+DefineEngineMethod(ShapeBase, getIconVisDis, S32, (), ,//dark
+   "@brief Get the current team number used by this shape.\n\n"
+   "@return the team number\n\n") {
+   return object->getIconVisDis();
+}
+DefineEngineMethod(ShapeBase, setIconVisDis, void, (S32 IconVisDis), ,//dark
+   "@brief Set the current team number of this shape.\n\n"
+   "@return void\n\n") {
+   object->setIconVisDis(IconVisDis);
+}
+
+
+DefineEngineMethod(ShapeBase, getIconColor, LinearColorF, (), ,//dark
+   "@brief Get the current team number used by this shape.\n\n"
+   "@return the team number\n\n") {
+   return object->getIconColor();
+}
+
+DefineEngineMethod(ShapeBase, setIconColor, void, (LinearColorF IconColor), ,//dark
+   "@brief Set the current team number of this shape.\n\n"
+   "@return void\n\n") {
+   object->setIconColor(IconColor);
 }

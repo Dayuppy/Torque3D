@@ -39,6 +39,7 @@ class GuiHealthTextHud : public GuiControl
    bool mShowFrame;  
    bool mShowFill;  
    bool mShowEnergy;  
+   bool mShowBattery;
    bool mShowTrueHealth;  
   
    LinearColorF mFillColor;  
@@ -100,6 +101,7 @@ GuiHealthTextHud::GuiHealthTextHud()
 {  
    mShowFrame = mShowFill = true;  
    mShowEnergy = false;  
+   mShowBattery = false;
    mShowTrueHealth = false;  
   
    mFillColor.set(0, 0, 0, 0.5);  
@@ -129,6 +131,7 @@ void GuiHealthTextHud::initPersistFields()
    addField("showFrame", TypeBool, Offset(mShowFrame, GuiHealthTextHud), "If true, draw the frame.");  
    addField("showTrueValue", TypeBool, Offset(mShowTrueHealth, GuiHealthTextHud), "If true, we don't hardcode maxHealth to 100.");  
    addField("showEnergy", TypeBool, Offset(mShowEnergy, GuiHealthTextHud), "If true, display the energy value rather than the damage value.");  
+   addField("showBattery", TypeBool, Offset(mShowBattery, GuiHealthTextHud), "If true, display the Battery");
    endGroup("View");    
   
    addGroup("Alert");  
@@ -156,6 +159,8 @@ void GuiHealthTextHud::onRender(Point2I offset, const RectI &updateRect)
    // Damage value 0 = no damage (full health).    
    if(mShowEnergy)    
       mValue = control->getEnergyLevel();  
+   else if(mShowBattery)
+	   mValue = control->getBatteryLevel();
    else    
    {  
       if (mShowTrueHealth)  

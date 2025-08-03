@@ -616,7 +616,7 @@ Projectile::Projectile()
 {
    // Todo: ScopeAlways?
    mNetFlags.set(Ghostable);
-   mTypeMask |= ProjectileObjectType | LightObjectType | DynamicShapeObjectType;
+   mTypeMask |= ProjectileObjectType;
 
    mLight = LightManager::createLightInfo();
    mLight->setType( LightInfo::Point );   

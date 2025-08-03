@@ -113,7 +113,7 @@ GuiButtonBaseCtrl::GuiButtonBaseCtrl()
    mButtonType = ButtonTypePush;
    mUseMouseEvents = false;
    mMouseDragged = false;
-   mContainerOpaque = true;
+   mContainerOpaque = false;
 }
 
 //-----------------------------------------------------------------------------

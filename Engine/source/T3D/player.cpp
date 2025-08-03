@@ -62,7 +62,7 @@
 #include "materials/baseMatInstance.h"
 #include "math/mathUtils.h"
 #include "gfx/sim/debugDraw.h"
-
+#include "T3D/staticShape.h"
 #include "T3D/levelInfo.h"
 
 #ifdef TORQUE_EXTENDED_MOVE
@@ -117,7 +117,7 @@ static S32 sProneTrigger = 4;
 static S32 sSprintTrigger = 5;
 static S32 sImageTrigger0 = 0;
 static S32 sImageTrigger1 = 1;
-static S32 sJumpJetTrigger = 1;
+static S32 sJumpJetTrigger = 6;// note moveManager MaxTriggerKeys was changed to 8
 static S32 sVehicleDismountTrigger = 2;
 
 // Client prediction
@@ -207,7 +207,9 @@ DefineEnumType(playerSoundsEnum);
 
 ImplementEnumType(playerSoundsEnum, "enum types.\n"
    "@ingroup PlayerData\n\n")
-   { playerSoundsEnum::FootSoft,            "FootSoft", "..." },
+{
+   playerSoundsEnum::FootSoft, "FootSoft", "..."
+},
    { playerSoundsEnum::FootHard,            "FootHard","..." },
    { playerSoundsEnum::FootMetal,           "FootMetal","..." },
    { playerSoundsEnum::FootSnow,            "FootSnow","..." },
@@ -225,6 +227,7 @@ ImplementEnumType(playerSoundsEnum, "enum types.\n"
    { playerSoundsEnum::ImpactWaterMedium,   "ImpactWaterMedium","..." },
    { playerSoundsEnum::ImpactWaterHard,     "ImpactWaterHard","..." },
    { playerSoundsEnum::ExitWater,           "ExitWater","..." },
+{ playerSoundsEnum::JetSound,           "JetSound","..." },
 EndImplementEnumType;
 
 //----------------------------------------------------------------------------
@@ -334,9 +337,9 @@ PlayerData::PlayerData()
    maxFreelookAngle = 3.0f;
    maxTimeScale = 1.5f;
 
-   mass = 9.0f;         // from ShapeBase
-   maxEnergy = 60.0f;   // from ShapeBase
-   drag = 0.3f;         // from ShapeBase
+   mass = 90.0f;         // from ShapeBase
+   maxEnergy = 100.0f;   // from ShapeBase
+   drag = 0.0f;         // from ShapeBase
    density = 1.1f;      // from ShapeBase
 
    maxStepHeight = 1.0f;
@@ -351,15 +354,15 @@ PlayerData::PlayerData()
    transitionToLand = false;
 
    // Running/Walking
-   runForce = 40.0f * 9.0f;
+   runForce = 55.0f * 90.0f;
    runEnergyDrain = 0.0f;
    minRunEnergy = 0.0f;
-   maxForwardSpeed = 10.0f;
-   maxBackwardSpeed = 10.0f;
-   maxSideSpeed = 10.0f;
+   maxForwardSpeed = 15.0f;
+   maxBackwardSpeed = 13.0f;
+   maxSideSpeed = 13.0f;
 
    // Jumping
-   jumpForce = 75.0f;
+   jumpForce = 8.43f * 90.0f;
    jumpEnergyDrain = 0.0f;
    minJumpEnergy = 0.0f;
    jumpSurfaceAngle = 78.0f;
@@ -373,7 +376,7 @@ PlayerData::PlayerData()
    maxJumpSpeed = 2.0f * minJumpSpeed;
 
    // Sprinting
-   sprintForce = 50.0f * 9.0f;
+   sprintForce = 50.0f * 90.0f;
    sprintEnergyDrain = 0.0f;
    minSprintEnergy = 0.0f;
    maxSprintForwardSpeed = 15.0f;
@@ -385,13 +388,13 @@ PlayerData::PlayerData()
    sprintCanJump = true;
 
    // Swimming
-   swimForce = 55.0f * 9.0f;  
+   swimForce = 55.0f * 90.0f;
    maxUnderwaterForwardSpeed = 6.0f;
    maxUnderwaterBackwardSpeed = 6.0f;
    maxUnderwaterSideSpeed = 6.0f;
 
    // Crouching
-   crouchForce = 45.0f * 9.0f;
+   crouchForce = 45.0f * 90.0f;
    maxCrouchForwardSpeed = 4.0f;
    maxCrouchBackwardSpeed = 4.0f;
    maxCrouchSideSpeed = 4.0f;    
@@ -403,18 +406,23 @@ PlayerData::PlayerData()
    maxProneSideSpeed = 0.0f;     
 
    // Jetting
-   jetJumpForce = 0;
-   jetJumpEnergyDrain = 0;
-   jetMinJumpEnergy = 0;
-   jetJumpSurfaceAngle = 78;
-   jetMinJumpSpeed = 20;
-   jetMaxJumpSpeed = 100;
 
-   horizMaxSpeed = 80.0f;
-   horizResistSpeed = 38.0f;
-   horizResistFactor = 1.0f;
+   jetEmitter = NULL;//dark
+   jetEmitterID = 0; //dark
+   jetForce = 37.28f * 90.0f;//dark
+   underwaterJetForce = 100.1f;//dark
+   underwaterVertJetFactor = 1.5f;//dark
+   underwaterJetEnergyDrain = 0.6f;//dark
+   jetEnergyDrain = 0.9f;//dark
+   minJetEnergy = 3.0f;//dark
+   maxJetHorizontalPercentage = 0.6f;//dark
+   maxJetForwardSpeed = 30.0f;//dark
 
-   upMaxSpeed = 80.0f;
+   horizMaxSpeed = 500.0f;
+   horizResistSpeed = 48.0f;
+   horizResistFactor = 0.0f;
+
+   upMaxSpeed = 500.0f;
    upResistSpeed = 38.0f;
    upResistFactor = 1.0f;
 
@@ -481,7 +489,8 @@ PlayerData::PlayerData()
    groundImpactShakeFalloff = 10.0f;
 
    // Air control
-   airControl = 0.0f;
+   airControl = 10.0f;//dark
+   jetCode = 0;
 
    jumpTowardsNormal = true;
 
@@ -510,8 +519,8 @@ bool PlayerData::preload(bool server, String &errorStr)
       minJumpEnergy = jumpEnergyDrain;   
 
    // Jetting
-   if (jetMinJumpEnergy < jetJumpEnergyDrain)
-      jetMinJumpEnergy = jetJumpEnergyDrain;
+   if (minJetEnergy < jetEnergyDrain)//dark
+      minJetEnergy = jetEnergyDrain;//dark
 
    // Validate some of the data
    if (fallingSpeedThreshold > 0.0f)
@@ -622,6 +631,10 @@ bool PlayerData::preload(bool server, String &errorStr)
    if (!dustEmitter && dustID != 0 )
       if (!Sim::findObject(dustID, dustEmitter))
          Con::errorf(ConsoleLogEntry::General, "PlayerData::preload - Invalid packet, bad datablockId(dustEmitter): 0x%x", dustID);
+
+   if (!jetEmitter && jetEmitterID != 0)//dark  
+      if (!Sim::findObject(jetEmitterID, jetEmitter))//dark
+         Con::errorf(ConsoleLogEntry::General, "PlayerData::preload - Invalid packet, bad datablockId(jetEmitter): 0x%x", jetEmitterID);//dark
 
    for (S32 i=0; i<NUM_SPLASH_EMITTERS; i++)
       if( !splashEmitterList[i] && splashEmitterIDList[i] != 0 )
@@ -948,26 +961,22 @@ void PlayerData::initPersistFields()
 
    addGroup( "Movement: Jetting" );
 
-      addField( "jetJumpForce", TypeF32, Offset(jetJumpForce, PlayerData),
-         "@brief Force used to accelerate the player when a jet jump is initiated.\n\n" );
-
-      addField( "jetJumpEnergyDrain", TypeF32, Offset(jetJumpEnergyDrain, PlayerData),
-         "@brief Energy level drained each time the player jet jumps.\n\n"
-         "@note Setting this to zero will disable any energy drain\n"
-         "@see jetMinJumpEnergy\n");
-      addField( "jetMinJumpEnergy", TypeF32, Offset(jetMinJumpEnergy, PlayerData),
-         "@brief Minimum energy level required to jet jump.\n\n"
-         "@see jetJumpEnergyDrain\n");
-
-      addField( "jetMinJumpSpeed", TypeF32, Offset(jetMinJumpSpeed, PlayerData),
-         "@brief Minimum speed needed to jet jump.\n\n"
-         "If the player's own z velocity is greater than this, then it is used to scale "
-         "the jet jump speed, up to jetMaxJumpSpeed.\n"
-         "@see jetMaxJumpSpeed\n");
-      addField( "jetMaxJumpSpeed", TypeF32, Offset(jetMaxJumpSpeed, PlayerData),
-         "@brief Maximum vertical speed before the player can no longer jet jump.\n\n" );
-      addField( "jetJumpSurfaceAngle", TypeF32, Offset(jetJumpSurfaceAngle, PlayerData),
-         "@brief Angle from vertical (in degrees) where the player can jet jump.\n\n" );
+   addField("jetForce", TypeF32, Offset(jetForce, PlayerData));//dark
+   addField("underwaterJetForce", TypeF32, Offset(underwaterJetForce, PlayerData));//dark
+   addField("underwaterVertJetFactor", TypeF32, Offset(underwaterVertJetFactor, PlayerData));//dark
+   addField("underwaterJetEnergyDrain", TypeF32, Offset(underwaterJetEnergyDrain, PlayerData));//dark
+   addField("jetEnergyDrain", TypeF32, Offset(jetEnergyDrain, PlayerData));//dark
+   addField("minJetEnergy", TypeF32, Offset(minJetEnergy, PlayerData));//dark
+   addField("maxJetHorizontalPercentage", TypeF32, Offset(maxJetHorizontalPercentage, PlayerData));//dark
+   addField("maxJetForwardSpeed", TypeF32, Offset(maxJetForwardSpeed, PlayerData));//dark
+   addField("jetEmitter", TYPEID< ParticleEmitterData >(), Offset(jetEmitter, PlayerData));//dark
+   //addField("jetSound", TypeSFXTrackName, Offset(sound[JetSound], PlayerData),//dark
+   //   "Looping sound to play while the player is jetting.");//dark
+   addField("airControl", TypeF32, Offset(airControl, PlayerData),//dark
+      "@brief Amount of movement control the player has when in the air.\n\n"//dark
+      "This is applied as a multiplier to the player's x and y motion.\n");//dark
+   addField("jetCode", TypeF32, Offset(jetCode, PlayerData),//dark
+      "@brief switches jet sim code 1 for 1 0 for 2");//dark
 
    endGroup( "Movement: Jetting" );
 
@@ -1265,12 +1274,23 @@ void PlayerData::packData(BitStream* stream)
    stream->write(maxProneSideSpeed);
 
    // Jetting
-   stream->write(jetJumpForce);
-   stream->write(jetJumpEnergyDrain);
-   stream->write(jetMinJumpEnergy);
-   stream->write(jetMinJumpSpeed);
-   stream->write(jetMaxJumpSpeed);
-   stream->write(jetJumpSurfaceAngle);
+
+   stream->write(jetForce);//dark
+   stream->write(underwaterJetForce);//dark
+   stream->write(underwaterVertJetFactor);//dark
+   stream->write(underwaterJetEnergyDrain);//dark
+   stream->write(jetEnergyDrain);//dark
+   stream->write(minJetEnergy);//dark
+   stream->write(maxJetHorizontalPercentage);//dark
+   stream->write(maxJetForwardSpeed);//dark
+
+
+
+   if (stream->writeFlag(jetEmitter))//dark
+   {//dark
+      stream->writeRangedU32(jetEmitter->getId(), DataBlockObjectIdFirst, DataBlockObjectIdLast);//dark
+   }//dark
+
 
    stream->write(horizMaxSpeed);
    stream->write(horizResistSpeed);
@@ -1348,6 +1368,7 @@ void PlayerData::packData(BitStream* stream)
 
    // Air control
    stream->write(airControl);
+   stream->write(jetCode);
 
    // Jump off at normal
    stream->writeFlag(jumpTowardsNormal);
@@ -1446,12 +1467,19 @@ void PlayerData::unpackData(BitStream* stream)
    stream->read(&maxProneSideSpeed);
 
    // Jetting
-   stream->read(&jetJumpForce);
-   stream->read(&jetJumpEnergyDrain);
-   stream->read(&jetMinJumpEnergy);
-   stream->read(&jetMinJumpSpeed);
-   stream->read(&jetMaxJumpSpeed);
-   stream->read(&jetJumpSurfaceAngle);
+   stream->read(&jetForce);//dark
+   stream->read(&underwaterJetForce);//dark
+   stream->read(&underwaterVertJetFactor);//dark
+   stream->read(&underwaterJetEnergyDrain);//dark
+   stream->read(&jetEnergyDrain);//dark
+   stream->read(&minJetEnergy);//dark
+   stream->read(&maxJetHorizontalPercentage);//dark
+   stream->read(&maxJetForwardSpeed);//dark
+
+   if (stream->readFlag())//dark
+   {//dark
+      jetEmitterID = (S32)stream->readRangedU32(DataBlockObjectIdFirst, DataBlockObjectIdLast);//dark
+   }//dark
 
    stream->read(&horizMaxSpeed);
    stream->read(&horizResistSpeed);
@@ -1528,6 +1556,7 @@ void PlayerData::unpackData(BitStream* stream)
 
    // Air control
    stream->read(&airControl);
+   stream->read(&jetCode);
 
    // Jump off at normal
    jumpTowardsNormal = stream->readFlag();
@@ -1560,7 +1589,9 @@ void PlayerData::unpackData(BitStream* stream)
 ImplementEnumType( PlayerPose,
    "@brief The pose of the Player.\n\n"
    "@ingroup gameObjects\n\n")
-   { Player::StandPose,    "Stand",    "Standard movement pose.\n" },
+{
+   Player::StandPose, "Stand", "Standard movement pose.\n"
+},
    { Player::SprintPose,   "Sprint",   "Sprinting pose.\n" },
    { Player::CrouchPose,   "Crouch",   "Crouch pose.\n" },
    { Player::PronePose,    "Prone",    "Prone pose.\n" },
@@ -1613,6 +1644,7 @@ Player::Player()
    mActionAnimation.callbackTripped = false;
    mState = MoveState;
    mJetting = false;
+   mJetSound = 0;//dark
    mFalling = false;
    mSwimming = false;
    mInWater = false;
@@ -1665,7 +1697,7 @@ Player::Player()
    mLastAbsoluteYaw = 0.0f;
    mLastAbsolutePitch = 0.0f;
    mLastAbsoluteRoll = 0.0f;
-   
+   mJetForceMod = 0.0f;
    afx_init();
 }
 
@@ -1776,7 +1808,8 @@ void Player::onRemove()
    if ( isGhost() )
    {
       SFX_DELETE( mMoveBubbleSound );
-      SFX_DELETE( mWaterBreathSound );
+      SFX_DELETE(mWaterBreathSound)
+         SFX_DELETE(mJetSound);
    }
 
    U32 i;
@@ -1923,12 +1956,17 @@ bool Player::onNewDataBlock( GameBaseData *dptr, bool reload )
 
       SFX_DELETE( mMoveBubbleSound );
       SFX_DELETE( mWaterBreathSound );
+      SFX_DELETE(mJetSound);//dark
+
 
       if ( mDataBlock->getPlayerSound(PlayerData::MoveBubbles) )
          mMoveBubbleSound = SFX->createSource( mDataBlock->getPlayerSoundProfile(PlayerData::MoveBubbles) );
 
       if ( mDataBlock->getPlayerSound(PlayerData::WaterBreath) )
          mWaterBreathSound = SFX->createSource( mDataBlock->getPlayerSoundProfile(PlayerData::WaterBreath) );
+
+      if (mDataBlock->getPlayerSound(PlayerData::JetSound))//dark
+         mJetSound = SFX->createSource(mDataBlock->getPlayerSoundProfile(PlayerData::JetSound));//dark
    }
 
    mObjBox.maxExtents.x = mDataBlock->boxSize.x * 0.5f;
@@ -1953,7 +1991,54 @@ bool Player::onNewDataBlock( GameBaseData *dptr, bool reload )
 }
 
 //----------------------------------------------------------------------------
+void Player::updateJetSound(F32 dt)//dark
+{//dark
+   if (mJetSound) {//dark
+      if (!mJetting)//dark 
+      {//dark
+         mJetSound->stop();//dark
+         return;//dark
+      }//dark
 
+      if (!mJetSound->isPlaying())//dark
+         mJetSound->play();//dark
+      mJetSound->setTransform(getTransform());//dark
+   }//dark
+}//dark
+//updateJetEmitter(mJetting,dt,mDataBlock->jetEmitter,0 ,1);
+void Player::updateJetEmitter(bool active, F32 dt, ParticleEmitterData* emitter, S32 idx, S32 count)
+{
+
+   if (!emitter)
+      return;
+   if (active) {
+      if (mDataBlock->jetEmitter) {
+
+         if (!bool(jetemitters)) {
+            jetemitters = new ParticleEmitter;
+            jetemitters->onNewDataBlock(emitter, false);
+            jetemitters->registerObject();
+         }
+
+         Point3F pos, axis;
+         MatrixF xf(true);
+         getMountTransform(2, MatrixF::Identity, &xf);
+         xf.getColumn(1, &axis);
+         xf.getColumn(3, &pos);
+         if (!pos)
+            pos = getPosition();
+         //jetemitters->emitParticles( pos, pos, Point3F( 0.0, 0.0, 1.0 ), Point3F( 0, 0, 0 ), 10 );  
+         jetemitters->emitParticles(pos, true, Point3F(0.0, 0.0, 1.0), getVelocity(), (U32)(dt * 1000));
+      }
+   }
+   else {
+
+      if (bool(jetemitters)) {
+         jetemitters->deleteWhenEmpty();
+
+      }
+   }
+}
 void Player::reSkin()
 {
    if ( isGhost() && mShapeInstance && mSkinNameHandle.isValidString() )
@@ -2280,7 +2365,9 @@ void Player::advanceTime(F32 dt)
    updateSplash();
    updateFroth(dt);
    updateWaterSounds(dt);
-
+   updateJetSound(dt);
+   //updateEmitter(bool active,F32 dt,ParticleEmitterData *emitter,S32 idx,S32 count)
+   updateJetEmitter(mJetting, dt, mDataBlock->jetEmitter, 0, 1);
    mLastPos = getPosition();
 
    if (mImpactSound)
@@ -2295,9 +2382,6 @@ void Player::advanceTime(F32 dt)
          gCamFXMgr.clear();
       }
    }
-
-   if (isMethod("interpolateTick"))
-      Con::executef(this, "interpolateTick", Con::getFloatArg(dt));
 }
 
 bool Player::getAIMove(Move* move)
@@ -2966,21 +3050,7 @@ void Player::updateMove(const Move* move)
       // Adjust the player's requested dir. to be parallel
       // to the contact surface.
       F32 pvl = pv.len();
-      if(mJetting)
-      {
-         pvl = moveVec.len();
-         if (pvl)
-         {
-            VectorF nn;
-            mCross(pv,VectorF(0.0f, 0.0f, 0.0f),&nn);
-            nn *= 1 / pvl;
-            VectorF cv(0.0f, 0.0f, 0.0f);
-            cv -= nn * mDot(nn,cv);
-            pv -= cv * mDot(pv,cv);
-            pvl = pv.len();
-         }
-      }
-      else if (!mPhysicsRep)
+      if (!mPhysicsRep)
       {
          // We only do this if we're not using a physics library.  The
          // library will take care of itself.
@@ -3025,30 +3095,7 @@ void Player::updateMove(const Move* move)
    }
    else if (!mSwimming && mDataBlock->airControl > 0.0f)
    {
-      VectorF pv;
-      pv = moveVec;
-      F32 pvl = pv.len();
-
-      if (pvl)
-         pv *= moveSpeed / pvl;
-
-      VectorF runAcc = pv - (mVelocity + acc);
-      runAcc.z = 0;
-      runAcc.x = runAcc.x * mDataBlock->airControl;
-      runAcc.y = runAcc.y * mDataBlock->airControl;
-      F32 runSpeed = runAcc.len();
-      // We don't test for sprinting when performing air control
-      F32 maxAcc = (mDataBlock->runForce / getMass()) * TickSec * 0.3f;
-
-      if (runSpeed > maxAcc)
-         runAcc *= maxAcc / runSpeed;
-
-      acc += runAcc;
-
-      // There are no special air control animations 
-      // so... increment this unless you really want to 
-      // play the run anims in the air.
-      mContactTimer++;
+      // i prob left this here for a reasion
    }
    else if (mSwimming)
    {
@@ -3206,37 +3253,84 @@ void Player::updateMove(const Move* move)
    if (move->trigger[sJumpJetTrigger] && !isMounted() && canJetJump())
    {
       mJetting = true;
-
-      // Scale the jump impulse base on maxJumpSpeed
-      F32 zSpeedScale = mVelocity.z;
-
-      if (zSpeedScale <= mDataBlock->jetMaxJumpSpeed)
-      {
-         zSpeedScale = (zSpeedScale <= mDataBlock->jetMinJumpSpeed)? 1:
-         1 - (zSpeedScale - mDataBlock->jetMinJumpSpeed) / (mDataBlock->jetMaxJumpSpeed - mDataBlock->jetMinJumpSpeed);
-
-         // Desired jump direction
-         VectorF pv = moveVec;
-         F32 len = pv.len();
-
-         if (len > 0.0f)
-            pv *= 1 / len;
-
-         // If we are facing into the surface jump up, otherwise
-         // jump away from surface.
-         F32 dot = mDot(pv,mJumpSurfaceNormal);
-         F32 impulse = mDataBlock->jetJumpForce / getMass();
-
-         if (dot <= 0)
-            acc.z += mJumpSurfaceNormal.z * impulse * zSpeedScale;
-         else
-         {
-            acc.x += pv.x * impulse * dot;
-            acc.y += pv.y * impulse * dot;
-            acc.z += mJumpSurfaceNormal.z * impulse * zSpeedScale;
+      if (mDataBlock->jetCode) {
+         if (!mDataBlock->maxJetForwardSpeed || mDataBlock->maxJetForwardSpeed == 0) {// safty check
+            mDataBlock->maxJetForwardSpeed = 0.001;
          }
+         if (mEnergy >= mDataBlock->minJetEnergy) {//dark
+            mEnergy -= mDataBlock->jetEnergyDrain;//dark
+         VectorF pv = moveVec;
+            VectorF Fvv = moveVec;//dark
+            VectorF Fvc = mVelocity;//dark 
+            F32 impulse = ((mDataBlock->jetForce + mJetForceMod) / mMass) * TickSec;//dark
+            Fvv.normalize();//dark
+            Fvv.z = 0;//dark
+            Fvc.z = 0;//dark
+            F32 jetVel = mDot(Fvc, Fvv);//dark
+            if (jetVel <= 0) {//dark
+               jetVel = 0;//dark
+            }//dark
+            F32 HorizontalPercentage;//dark
+            F32 verticalPercentage;//dark
+            if (jetVel >= mDataBlock->maxJetForwardSpeed) {//dark 
+               HorizontalPercentage = 0;//dark
+               verticalPercentage = 1; //1 being 100%//dark
+            }//dark
+            else {//dark
+               verticalPercentage = (jetVel / mDataBlock->maxJetForwardSpeed);//dark
+               HorizontalPercentage = (1 - verticalPercentage);//dark
+            }//dark
+            F32 HorizValue = impulse - (impulse * mDataBlock->maxJetHorizontalPercentage); //dark
+            F32 MaxJetForwardSpeedFactor = 1 - (jetVel / mDataBlock->maxJetForwardSpeed);//dark
 
-         mEnergy -= mDataBlock->jetJumpEnergyDrain;
+            if (MaxJetForwardSpeedFactor >= 1) {//dark
+               MaxJetForwardSpeedFactor = 1;//dark
+            }//dark
+            else if (MaxJetForwardSpeedFactor <= 0) {//dark
+               MaxJetForwardSpeedFactor = 0;//dark
+            }//dark
+            F32 HorizForce = (HorizontalPercentage * impulse) - (HorizValue * MaxJetForwardSpeedFactor);//dark
+            F32 VeirtForce = (verticalPercentage * impulse) + (HorizValue * MaxJetForwardSpeedFactor);//dark
+
+            acc.x += HorizForce * pv.x;//dark
+            acc.y += HorizForce * pv.y;//dark
+            if (acc.x != 0.0f || acc.y != 0.0f)//dark
+               acc.z += VeirtForce;//dark
+            else//dark
+               acc.z += impulse;//dark 
+
+         }
+      }
+      else {
+         if (mEnergy >= mDataBlock->minJetEnergy) {//dark
+            mEnergy -= mDataBlock->jetEnergyDrain;//dark
+            VectorF nMoveVec = moveVec;
+            nMoveVec.normalize();
+            nMoveVec.z = 0;
+            F32 impulse = ((mDataBlock->jetForce + mJetForceMod) / mMass) * TickSec;//dark
+            F32 pct;
+            VectorF mLVelocity = mVelocity;
+            mLVelocity.z = 0;
+
+            F32 dot = mDot(mLVelocity, nMoveVec);
+            if (dot > mDataBlock->maxJetForwardSpeed)
+               pct = 0;
+            else if (dot < 0)
+               pct = 1;
+            else
+               pct = 1 - (dot / mDataBlock->maxJetForwardSpeed);
+
+            if (pct > mDataBlock->maxJetHorizontalPercentage)
+               pct = mDataBlock->maxJetHorizontalPercentage;
+
+            acc.x += (pct * impulse) * nMoveVec.x;
+            acc.y += (pct * impulse) * nMoveVec.y;
+            if (moveVec.x != 0.0f || moveVec.y != 0.0f)//da
+               acc.z += (1 - pct) * impulse;
+            else//dark
+               acc.z += impulse;
+
+         }
       }
    }
    else
@@ -3398,7 +3492,7 @@ bool Player::canJump()
 
 bool Player::canJetJump()
 {
-   return mAllowJetJumping && mState == MoveState && mDamageState == Enabled && !isMounted() && mEnergy >= mDataBlock->jetMinJumpEnergy && mDataBlock->jetJumpForce != 0.0f;
+   return mAllowJetJumping && mState == MoveState && mDamageState == Enabled && !isMounted() && mEnergy >= mDataBlock->minJetEnergy && mDataBlock->jetForce != 0.0f;//dark
 }
 
 bool Player::canSwim()
@@ -4933,8 +5027,16 @@ Point3F Player::_move( const F32 travelTime, Collision *outCol )
                {
                   // No need to separate out the physical zones here, we want those
                   //  to cause a fallthrough as well...
+                  if (pConvex->getObject()->getTypeMask() & StaticShapeObjectType)
+                  {
+                     StaticShape* pField = dynamic_cast<StaticShape*>(pConvex->getObject());
+                     if (pField == NULL || (pField->getTeam() != getTeam()) || !pField->isForceField())
+                        pConvex->getPolyList(&eaPolyList);
+                  }
+                  else {
                   pConvex->getPolyList(&eaPolyList);
                }
+            }
             }
             pList = pList->wLink.mNext;
          }
@@ -4977,11 +5079,19 @@ Point3F Player::_move( const F32 travelTime, Collision *outCol )
             Box3F convexBox = pConvex->getBoundingBox();
             if (plistBox.isOverlapped(convexBox))
             {
+               if (pConvex->getObject()->getTypeMask() & StaticShapeObjectType)
+               {
+                  StaticShape* pField = dynamic_cast<StaticShape*>(pConvex->getObject());
+                  if (pField == NULL || (pField->getTeam() != getTeam()) || !pField->isForceField())
+                     pConvex->getPolyList(&sExtrudedPolyList);
+               }
+               else {
                if (pConvex->getObject()->getTypeMask() & PhysicalZoneObjectType)
                   pConvex->getPolyList(&sPhysZonePolyList);
                else
                   pConvex->getPolyList(&sExtrudedPolyList);
             }
+         }
          }
          pList = pList->wLink.mNext;
       }
@@ -5362,8 +5472,17 @@ void Player::_findContact( SceneObject **contactObject,
             !( objectMask & PhysicalZoneObjectType ) )
       {
          Box3F convexBox = pConvex->getBoundingBox();
-         if (plistBox.isOverlapped(convexBox))
+         if (plistBox.isOverlapped(convexBox)) {
+            if (pConvex->getObject()->getTypeMask() & StaticShapeObjectType)
+            {
+               StaticShape* pField = dynamic_cast<StaticShape*>(pConvex->getObject());
+               if (pField == NULL || (pField->getTeam() != getTeam()) || !pField->isForceField())
             pConvex->getPolyList(&polyList);
+      }
+            else {
+               pConvex->getPolyList(&polyList);
+            }
+         }
       }
       else
          outOverlapObjects->push_back( pConvex->getObject() );
@@ -6284,6 +6403,8 @@ void Player::writePacketData(GameConnection *connection, BitStream *stream)
    }
    else
       stream->writeFlag(false);
+
+   stream->write(mJetForceMod);
 }
 
 
@@ -6355,6 +6476,7 @@ void Player::readPacketData(GameConnection *connection, BitStream *stream)
    }
    else
       setControlObject(0);
+   stream->read(&mJetForceMod);
 }
 
 U32 Player::packUpdate(NetConnection *con, U32 mask, BitStream *stream)
@@ -7059,7 +7181,8 @@ void Player::calcClassRenderData()
          mWeaponBackFraction = 1.0f - rinfo.t;
       else
          mWeaponBackFraction = 0.0f;
-   } else {
+   }
+   else {
       mWeaponBackFraction = 0.0f;
    }
    enableCollision();

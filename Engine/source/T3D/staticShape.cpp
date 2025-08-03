@@ -202,6 +202,13 @@ void StaticShape::initPersistFields()
 {
    docsURL;
    Parent::initPersistFields();
+   addField("isForceField", TypeBool, Offset(mForceField, StaticShape),
+      "Marks this object as a forcefield so it skips the collision check with players");
+}
+void StaticShape::inspectPostApply(){
+   Parent::inspectPostApply();
+   if(isServerObject())
+      setMaskBits(NameMask);// forces update of forcefield when changed
 }
 
 bool StaticShape::onAdd()

@@ -74,18 +74,23 @@ void BtPlayer::init( const char *type,
    mSlopeAngle = runSurfaceCos;
    mStepHeight = stepHeight;
 
-   //if ( dStricmp( type, "Capsule" ) == 0 )
+   bool colMode = 1;
+   if (colMode)
    {
       F32 radius = getMax( size.x, size.y ) * 0.5f;
       F32 height = size.z - ( radius * 2.0f );
       mColShape = new btCapsuleShapeZ( radius, height );
-      mColShape->setMargin( 0.05f );
+      mColShape->setMargin(0.01f);
       mOriginOffset = ( height * 0.5 ) + radius;
    }
-   //else
+   else
    {
-      //mColShape = new btBoxShape( btVector3( 0.5f, 0.5f, 1.0f ) );
-      //mOriginOffset = 1.0f;
+      //F32 radius = getMax(size.x, size.y) * 0.5f;
+      //F32 height = size.z - (radius * 2.0f);
+      mColShape = new btBoxShape(btVector3(size.x / 2, size.y / 2, size.z / 2));
+      mColShape->setMargin(0.05f);
+      //mOriginOffset = (height * 0.5) + radius;
+      mOriginOffset = size.z / 2; // Default offset for box shape
    }
 
    mGhostObject = new btPairCachingGhostObject();

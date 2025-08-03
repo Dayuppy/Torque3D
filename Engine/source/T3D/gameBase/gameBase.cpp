@@ -508,7 +508,7 @@ void GameBase::scriptOnAdd()
 {
    // Script onAdd() must be called by the leaf class after
    // everything is ready.
-   if (mDataBlock && !isGhost())
+   if (mDataBlock && isServerObject())
       mDataBlock->onAdd_callback( this );
 }
 

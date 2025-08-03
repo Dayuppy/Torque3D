@@ -28,9 +28,10 @@
 #include "scene/sceneManager.h"
 #include "T3D/gameBase/gameConnection.h"
 #include "T3D/shapeBase.h"
+#include "T3D/gameBase/gameBase.h"
 #include "gfx/gfxDrawUtil.h"
 #include "console/engineAPI.h"
-
+#include "core/strings/stringUnit.h"
 
 //----------------------------------------------------------------------------
 /// Displays name & damage above shape objects.
@@ -52,9 +53,17 @@ class GuiShapeNameHud : public GuiControl {
    LinearColorF   mTextColor;
    LinearColorF   mLabelFillColor;
    LinearColorF   mLabelFrameColor;
+   bool		mTwoTeamMode;
+   LinearColorF   mTeamColor;
+   LinearColorF   mEnemyColor;
+   LinearColorF   mNoTeamColor;
+   String       imagePath;
+   GFXTexHandle imageHandle;
 
    F32      mVerticalOffset;
+   F32      mVerticalIconOffset;
    F32      mDistanceFade;
+   F32      mVisDistance;
    bool     mShowFrame;
    bool     mShowFill;
    bool     mShowLabelFrame;
@@ -63,7 +72,7 @@ class GuiShapeNameHud : public GuiControl {
    Point2I  mLabelPadding;
 
 protected:
-   void drawName( Point2I offset, const char *buf, F32 opacity);
+   void drawName(Point2I offset, Point2I offsetI, const char* buf, F32 opacity, LinearColorF color, String icon);
 
 public:
    GuiShapeNameHud();
@@ -110,6 +119,9 @@ ConsoleDocClass( GuiShapeNameHud,
    "@ingroup GuiGame\n"
 );
 
+/// Default distance for object's information to be displayed.
+static const F32 cDefaultVisibleDistance = 500.0f;
+
 GuiShapeNameHud::GuiShapeNameHud()
 {
    mFillColor.set( 0.25f, 0.25f, 0.25f, 0.25f );
@@ -117,11 +129,20 @@ GuiShapeNameHud::GuiShapeNameHud()
    mLabelFillColor.set( 0.25f, 0.25f, 0.25f, 0.25f );
    mLabelFrameColor.set( 0, 1, 0, 1 );
    mTextColor.set( 0, 1, 0, 1 );
+
+   mTwoTeamMode = true;
+   mTeamColor.set(0, 1, 0, 1);
+   mEnemyColor.set(1, 0, 0, 1);
+   mNoTeamColor.set(1, 1, 1, 1);
+
+
    mShowFrame = mShowFill = true;
    mShowLabelFrame = mShowLabelFill = false;
    mVerticalOffset = 0.5f;
+   mVerticalIconOffset = 0.05f;
    mDistanceFade = 0.1f;
    mLabelPadding.set(0, 0);
+   mVisDistance = gClientSceneGraph->getVisibleDistance();
 }
 
 void GuiShapeNameHud::initPersistFields()
@@ -133,6 +154,10 @@ void GuiShapeNameHud::initPersistFields()
    addField( "textColor",  TypeColorF, Offset( mTextColor, GuiShapeNameHud ), "Color for the text on this control." );
    addField( "labelFillColor",  TypeColorF, Offset( mLabelFillColor, GuiShapeNameHud ), "Color for the background of each shape name label." );
    addField( "labelFrameColor", TypeColorF, Offset( mLabelFrameColor, GuiShapeNameHud ), "Color for the frames around each shape name label."  );
+   //  addField( "TwoTeamMode",  TypeBool, Offset( mTwoTeamMode, GuiShapeNameHud ), "If true, Enemys are red."  );
+   addField("TeamColor", TypeColorF, Offset(mTeamColor, GuiShapeNameHud), "Color Name.");
+   addField("EnemyColor", TypeColorF, Offset(mEnemyColor, GuiShapeNameHud), "Color Name.");
+   addField("NoTeamColor", TypeColorF, Offset(mNoTeamColor, GuiShapeNameHud), "Color Name.");
    endGroup("Colors");     
 
    addGroup("Misc");       
@@ -142,7 +167,9 @@ void GuiShapeNameHud::initPersistFields()
    addField( "showLabelFrame", TypeBool, Offset( mShowLabelFrame, GuiShapeNameHud ), "If true, we draw a frame around each shape name label."  );
    addField( "labelPadding", TypePoint2I, Offset( mLabelPadding, GuiShapeNameHud ), "The padding (in pixels) between the label text and the frame." );
    addField( "verticalOffset", TypeF32, Offset( mVerticalOffset, GuiShapeNameHud ), "Amount to vertically offset the control in relation to the ShapeBase object in focus." );
+   addField("verticalIconOffset", TypeF32, Offset(mVerticalIconOffset, GuiShapeNameHud), "Amount to vertically offset the control in relation to the ShapeBase object in focus.");
    addField( "distanceFade", TypeF32, Offset( mDistanceFade, GuiShapeNameHud ), "Visibility distance (how far the player must be from the ShapeBase object in focus) for this control to render." );
+   addField("visibleDistance", TypeF32, Offset(mVisDistance, GuiShapeNameHud));
    endGroup("Misc");
    Parent::initPersistFields();
 }
@@ -172,7 +199,7 @@ void GuiShapeNameHud::onRender( Point2I, const RectI &updateRect)
    // Must have a connection and control object
    GameConnection* conn = GameConnection::getConnectionToServer();
    if (!conn) return;
-   GameBase * control = dynamic_cast<GameBase*>(conn->getControlObject());
+   ShapeBase* control = dynamic_cast<ShapeBase*>(conn->getControlObject());
    if (!control) return;
 
    // Get control camera info
@@ -205,11 +232,11 @@ void GuiShapeNameHud::onRender( Point2I, const RectI &updateRect)
       if ( shape ) {
          if (shape != control && shape->getShapeName()) 
          {
-
+            visDistance = shape->getIconVisDis();
             // Target pos to test, if it's a player run the LOS to his eye
             // point, otherwise we'll grab the generic box center.
             Point3F shapePos;
-            if (shape->getTypeMask() & (PlayerObjectType | VehicleObjectType))
+            if (shape->getTypeMask() & PlayerObjectType)
             {
                MatrixF eye;
 
@@ -258,14 +285,40 @@ void GuiShapeNameHud::onRender( Point2I, const RectI &updateRect)
             // the distance opacity used to fade the labels into the
             // distance.
             Point3F projPnt;
+            Point2I projPntI(0, 0);//icon
+            imagePath = StringUnit::getUnit(shape->getShapeIcon(), 0, "\t");
+            if (imagePath.isNotEmpty()) {
+               shapePos.z += mVerticalOffset + (shapeDist * mVerticalIconOffset);//  0.066 adjust for distances and hight
+            }
+            else {
             shapePos.z += mVerticalOffset;
+            }
             if (!parent->project(shapePos, &projPnt))
                continue;
             F32 opacity = (shapeDist < fadeDistance)? 1.0:
                1.0 - (shapeDist - fadeDistance) / (visDistance - fadeDistance);
 
             // Render the shape's name
-            drawName(Point2I((S32)projPnt.x, (S32)projPnt.y),shape->getShapeName(),opacity);
+            int myId = control->getTeam();
+            int targetId = shape->getTeam();
+            LinearColorF iconColor = shape->getIconColor();
+            // Here we use the default  
+            LinearColorF  renderColor = mTextColor;
+            if (iconColor == LinearColorF(1, 1, 1, 1)) {
+               if (myId != targetId) {
+                  renderColor = mEnemyColor;
+               }
+               else if (myId == targetId) {
+                  renderColor = mTeamColor;
+               }
+               if (targetId == 0) {
+                  renderColor = mNoTeamColor;
+               }
+            }
+            else {
+               renderColor = iconColor;
+            }
+            drawName(Point2I((S32)projPnt.x, (S32)projPnt.y), Point2I((S32)projPntI.x, (S32)projPntI.y), shape->getShapeName(), opacity, renderColor, imagePath);
          }
       }
    }
@@ -289,8 +342,51 @@ void GuiShapeNameHud::onRender( Point2I, const RectI &updateRect)
 ///                  specified y position.)
 /// @param   name    String name to display.
 /// @param   opacity Opacity of name (a fraction).
-void GuiShapeNameHud::drawName(Point2I offset, const char *name, F32 opacity)
+void GuiShapeNameHud::drawName(Point2I offset, Point2I offsetI, const char* name, F32 opacity, LinearColorF color, String icon)
 {
+
+   if (icon.isNotEmpty()) {
+
+      F32 width = mProfile->mFont->getStrWidth((const UTF8*)name) + mLabelPadding.x * 2;
+      F32 height = mProfile->mFont->getHeight() + mLabelPadding.y * 2;
+      Point2I extent = Point2I(width, height);
+      GFXTextureObject* texture = NULL;
+      // Center the name
+
+      imageHandle.set(icon.c_str(), &GFXDefaultGUIProfile, avar("%s() - imageHandle (line %d)", __FUNCTION__, __LINE__));
+      texture = imageHandle;
+      U32 iconWidth = texture->getWidth();
+      U32 iconHeight = texture->getHeight();
+      Point2I renderPos = offset;
+      renderPos.x -= iconWidth / 2;
+      renderPos.y -= iconHeight / 2;
+      Point2I iconSize(iconWidth, iconHeight);
+
+      RectI renderRect(renderPos, iconSize);
+
+      GFXDrawUtil* drawUtil = GFX->getDrawUtil();
+
+      // Background fill first
+      if (mShowLabelFill)
+         drawUtil->drawRectFill(RectI(offset, extent), mLabelFillColor.toColorI());
+
+
+      color.alpha = opacity;
+      GFX->getDrawUtil()->setBitmapModulation(color.toColorI());
+      GFX->getDrawUtil()->drawBitmapStretch(texture, renderRect);
+
+      Point2I pos(offset);
+      Point2I extentt(mProfile->mFont->getStrWidth((const UTF8*)name), mProfile->mFont->getHeight());
+      pos.x += (texture->getWidth() / 2) - (extentt.x / 2);
+      pos.y += (texture->getHeight() / 2) + 3;
+      drawUtil->drawText(mProfile->mFont, pos + mLabelPadding, name);
+      GFX->getDrawUtil()->clearBitmapModulation();
+
+      // Border last
+      if (mShowLabelFrame)
+         drawUtil->drawRect(RectI(offset, extent), mLabelFrameColor.toColorI());
+   }
+   else {
    F32 width = mProfile->mFont->getStrWidth((const UTF8 *)name) + mLabelPadding.x * 2;
    F32 height = mProfile->mFont->getHeight() + mLabelPadding.y * 2;
    Point2I extent = Point2I(width, height);
@@ -314,5 +410,6 @@ void GuiShapeNameHud::drawName(Point2I offset, const char *name, F32 opacity)
    // Border last
    if (mShowLabelFrame)
       drawUtil->drawRect(RectI(offset, extent), mLabelFrameColor.toColorI());
+   }
 }
 

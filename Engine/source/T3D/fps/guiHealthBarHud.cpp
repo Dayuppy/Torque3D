@@ -43,6 +43,7 @@ class GuiHealthBarHud : public GuiControl
    bool     mShowFrame;
    bool     mShowFill;
    bool     mDisplayEnergy;
+   bool		mDisplayBattery;
    bool     mFlip;
 
    LinearColorF   mFillColor;
@@ -56,7 +57,7 @@ class GuiHealthBarHud : public GuiControl
 
 public:
    GuiHealthBarHud();
-
+   F32 mBatteryValue;
    void onRender( Point2I, const RectI &) override;
    static void initPersistFields();
    DECLARE_CONOBJECT( GuiHealthBarHud );
@@ -99,6 +100,7 @@ GuiHealthBarHud::GuiHealthBarHud()
 {
    mShowFrame = mShowFill = true;
    mDisplayEnergy = false;
+   mDisplayBattery = false;
    mFillColor.set(0, 0, 0, 0.5);
    mFrameColor.set(0, 1, 0, 1);
    mDamageFillColor.set(0, 1, 0, 1);
@@ -106,7 +108,7 @@ GuiHealthBarHud::GuiHealthBarHud()
    mPulseRate = 0;
    mPulseThreshold = 0.3f;
    mValue = 0.2f;
-
+   mBatteryValue = 0;
    mFlip = false;
 }
 
@@ -128,6 +130,7 @@ void GuiHealthBarHud::initPersistFields()
    addField( "showFill", TypeBool, Offset( mShowFill, GuiHealthBarHud ), "If true, we draw the background color of the control." );
    addField( "showFrame", TypeBool, Offset( mShowFrame, GuiHealthBarHud ), "If true, we draw the frame of the control." );
    addField( "displayEnergy", TypeBool, Offset( mDisplayEnergy, GuiHealthBarHud ), "If true, display the energy value rather than the damage value." );
+   addField("displayBattery", TypeBool, Offset(mDisplayBattery, GuiHealthBarHud), "If true, display the energy pool value rather than the damage value.");
    addField(  "flip", TypeBool, Offset( mFlip, GuiHealthBarHud), "If true, will fill bar in opposite direction.");
    endGroup("Misc");
 
@@ -153,6 +156,10 @@ void GuiHealthBarHud::onRender(Point2I offset, const RectI &updateRect)
    if(mDisplayEnergy)
    {
       mValue = control->getEnergyValue();
+   }
+   else if (mDisplayBattery){
+	   mValue = control->getBatteryValue();
+	   mBatteryValue = control->getBatteryLevel();
    }
    else
    {
@@ -202,4 +209,10 @@ void GuiHealthBarHud::onRender(Point2I offset, const RectI &updateRect)
    // Border last
    if (mShowFrame)
       GFX->getDrawUtil()->drawRect(updateRect, mFrameColor.toColorI());
+}
+DefineEngineMethod(GuiHealthBarHud, getBatteryLevel, F32, (), ,
+	"@brief Get the object's current energy level.\n\n"
+	"@return energy  Pool level\n")
+{
+	return object->mBatteryValue;
 }

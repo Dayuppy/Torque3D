@@ -176,14 +176,15 @@ struct PlayerData: public ShapeBaseData {
    F32 maxProneSideSpeed;           ///< Maximum side speed when prone
 
    // Jetting
-   F32 jetJumpForce;
-   F32 jetJumpEnergyDrain;    ///< Energy per jump
-   F32 jetMinJumpEnergy;
-   F32 jetMinJumpSpeed;
-   F32 jetMaxJumpSpeed;
-   F32 jetJumpSurfaceAngle;   ///< Angle vertical degrees
    /// @}
-
+   F32 jetForce;//dark
+   F32 underwaterJetForce;//dark
+   F32 underwaterVertJetFactor;//dark
+   F32 jetEnergyDrain;//dark
+   F32 underwaterJetEnergyDrain;//dark
+   F32 minJetEnergy;//dark
+   F32 maxJetHorizontalPercentage;//dark
+   F32 maxJetForwardSpeed;//dark
    /// @name Hitboxes
    /// @{
 
@@ -229,6 +230,7 @@ struct PlayerData: public ShapeBaseData {
       ImpactWaterMedium,
       ImpactWaterHard,
       ExitWater,
+      JetSound,//dark
       MaxSounds
    };
 
@@ -340,6 +342,8 @@ struct PlayerData: public ShapeBaseData {
    ParticleEmitterData * dustEmitter;
    S32 dustID;
 
+   ParticleEmitterData* jetEmitter;//dark
+   S32 jetEmitterID;//dark
    SplashData* splash;
    S32 splashId;
    F32 splashVelocity;
@@ -355,6 +359,7 @@ struct PlayerData: public ShapeBaseData {
 
    // Air control
    F32 airControl;
+   F32 jetCode;
 
    // Jump off surfaces at their normal rather than straight up
    bool jumpTowardsNormal;
@@ -460,7 +465,7 @@ protected:
    VectorF mVelocity;               ///< Velocity
    Point3F mAnchorPoint;            ///< Pos compression anchor
    S32 mImpactSound;
-
+   F32 mAccDif;                     // for speed changes //dark
    bool mUseHeadZCalc;              ///< Including mHead.z in transform calculations
 
    F32 mLastAbsoluteYaw;            ///< Stores that last absolute yaw value as passed in by ExtendedMove
@@ -497,6 +502,7 @@ protected:
 
    SFXSource* mMoveBubbleSound;   ///< Sound for moving bubbles
    SFXSource* mWaterBreathSound;  ///< Sound for underwater breath
+   SFXSource* mJetSound;//dark
 
    SimObjectPtr<ShapeBase> mControlObject; ///< Controlling object
 
@@ -627,7 +633,7 @@ protected:
 
    // Jetting
    bool mJetting;
-
+   SimObjectPtr< ParticleEmitter > jetemitters;
    ///Update the movement
    virtual void updateMove(const Move *move);
 
@@ -709,6 +715,8 @@ protected:
    void updateSplash();                             ///< Update the splash effect
    void updateFroth( F32 dt );                      ///< Update any froth
    void updateWaterSounds( F32 dt );                ///< Update water sounds
+   void updateJetSound(F32 dt);//dark
+   void updateJetEmitter(bool active, F32 dt, ParticleEmitterData* emitter, S32 idx, S32 count);
    void createSplash( Point3F &pos, F32 speed );    ///< Creates a splash
    bool collidingWithWater( Point3F &waterHeight ); ///< Are we colliding with water?
    /// @}
@@ -813,6 +821,7 @@ public:
    void prepRenderImage( SceneRenderState* state ) override;
    virtual void renderConvex( ObjectRenderInst *ri, SceneRenderState *state, BaseMatInstance *overrideMat );   
    void renderMountedImage( U32 imageSlot, TSRenderState &rstate, SceneRenderState *state ) override;
+   F32 mJetForceMod;
 private:
    static void  afx_consoleInit();
    void         afx_init();

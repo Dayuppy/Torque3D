@@ -25,9 +25,12 @@ public:
 
    DECLARE_CONOBJECT(GuiBitmapItemExtended);
    DECLARE_CALLBACK(void, onMouseDragged, ());
+   DECLARE_CALLBACK(void, onMouseDown, ());
    DECLARE_CALLBACK(void, onMouseUp, ());
    DECLARE_CALLBACK(void, onMouseEnter, ());
    DECLARE_CALLBACK(void, onMouseLeave, ());
+   DECLARE_CALLBACK(void, onClick, ());
+   DECLARE_CALLBACK(void, onRightClick, ());
 
 protected:
    // Icon Asset & texture
@@ -102,9 +105,12 @@ protected:
    virtual void onRender(Point2I offset, const RectI& updateRect) override;
 
    virtual void onMouseDragged(const GuiEvent& event) override;
+   virtual void onMouseDown(const GuiEvent&) override;
    virtual void onMouseUp(const GuiEvent&) override;
    virtual void onMouseEnter(const GuiEvent&) override;
    virtual void onMouseLeave(const GuiEvent&) override;
+   virtual void onRightMouseUp(const GuiEvent&) override;
+   virtual void onAction() override;
 
    /// Called when this control gains keyboard focus
    virtual void onGainFirstResponder() override;

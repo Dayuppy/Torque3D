@@ -20,6 +20,10 @@ IMPLEMENT_CALLBACK(GuiBitmapItemExtended, onMouseDragged, void, (), (),
    "pressed the left mouse button on the control and then moves the mouse over a certain distance threshold with "
    "the mouse button still pressed.");
 
+IMPLEMENT_CALLBACK(GuiBitmapItemExtended, onMouseDown, void, (), (),
+   "If #useMouseEvents is true, this is called when the left mouse button is pressed on an (active) "
+   "button.");
+
 IMPLEMENT_CALLBACK(GuiBitmapItemExtended, onMouseUp, void, (), (),
    "If #useMouseEvents is true, this is called when the left mouse button is release over an (active) "
    "button.\n\n"
@@ -34,6 +38,11 @@ IMPLEMENT_CALLBACK(GuiBitmapItemExtended, onMouseLeave, void, (), (),
    "If #useMouseEvents is true, this is called when the mouse cursor moves off the button (only if the button "
    "had previously received an onMouseEvent() event).");
 
+IMPLEMENT_CALLBACK(GuiBitmapItemExtended, onClick, void, (), (),
+   "Called when the primary action of the button is triggered (e.g. by a left mouse click).");
+
+IMPLEMENT_CALLBACK(GuiBitmapItemExtended, onRightClick, void, (), (),
+   "Called when the right mouse button is clicked on the button.");
 
 //-----------------------------------------------------------------------------
 // Asset setters (same style as icon)
@@ -266,10 +275,32 @@ void GuiBitmapItemExtended::initPersistFields()
 //-----------------------------------------------------------------------------
 // Mouse events
 //-----------------------------------------------------------------------------
+void GuiBitmapItemExtended::onAction()
+{
+   if (!mActive)
+      return;
+   onClick_callback();
+   Parent::onAction();
+}
+void GuiBitmapItemExtended::onRightMouseUp(const GuiEvent& event)
+{
+   if (!mActive)
+      return;
+   onRightClick_callback();
+   Parent::onRightMouseUp(event);
+}
+
+
 void GuiBitmapItemExtended::onMouseDragged(const GuiEvent& event)
 {
    onMouseDragged_callback();
    Parent::onMouseDragged(event);
+}
+void GuiBitmapItemExtended::onMouseDown(const GuiEvent& event)
+{
+   if (!mActive)
+      return;
+  onMouseDown_callback();
 }
 void GuiBitmapItemExtended::onMouseUp(const GuiEvent& event)
 {

@@ -392,11 +392,11 @@ void GuiContextMenuControl::openMenu(Point2I pos, const char* contextObjId)
 //-----------------------------------------------------------------------------
 void GuiContextMenuControl::closeMenu()
 {
-    mVisible = false;
-    clearEntries();
-    setUpdate();
-    if (auto canvas = dynamic_cast<GuiCanvas*>(getRoot()))
-        canvas->popDialogControl(this);
+   //mVisible = false;
+   //clearEntries();
+   //setUpdate();
+   //if (auto canvas = dynamic_cast<GuiCanvas*>(getRoot()))
+      //canvas->popDialogControl(this);
 }
 
 //-----------------------------------------------------------------------------
@@ -583,21 +583,16 @@ void GuiContextMenuControl::onMouseDown(const GuiEvent& ev)
         // Positioning of the submenu is handled by the script's x/y parameters.
         return;
     }
-
-    // Otherwise, close this menu after action
-    if (GuiCanvas* canvas = dynamic_cast<GuiCanvas*>(getRoot()))
-        canvas->popDialogControl(this);
-    mVisible = false;
 }
 
 void GuiContextMenuControl::onRightMouseDown(const GuiEvent&)
 {
-    closeMenu();
+   //closeMenu();
 }
 
 void GuiContextMenuControl::onLoseFirstResponder()
 {
-    closeMenu();
+   //closeMenu();
 }
 
 //-----------------------------------------------------------------------------

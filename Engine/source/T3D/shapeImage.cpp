@@ -3044,6 +3044,10 @@ TICKAGAIN:
 
    ShapeBaseImageData::StateData& stateData = *image.state;
 
+   if (dt < 0.001) {//dark fail safe go to can hit floating point errors and cause the engine to hang
+      dt = 0.001;//dark
+   }//dark
+
    if ( image.delayTime > dt )
       elapsed = dt;
    else

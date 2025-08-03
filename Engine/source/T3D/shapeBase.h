@@ -91,7 +91,7 @@ class SFXProfile;
 
 typedef void* Light;
 
-const F32 gGravity = -9.8f;
+const F32 gGravity = -26.9f;
 
 //--------------------------------------------------------------------------
 
@@ -900,6 +900,7 @@ protected:
    String            mAppliedSkinName;
 
    NetStringHandle mShapeNameHandle;   ///< Name sent to client
+   NetStringHandle mShapeIconHandle;//Dark
    /// @}
 
    /// @name Physical Properties
@@ -908,6 +909,8 @@ protected:
    S32 mAiPose;                     ///< Current pose.
    F32 mEnergy;                     ///< Current enery level.
    F32 mRechargeRate;               ///< Energy recharge rate (in units/tick).
+   F32 mBattery;
+   F32 maxBattery;
 
    F32 mMass;                       ///< Mass.
    F32 mOneOverMass;                ///< Inverse of mass.
@@ -976,9 +979,16 @@ protected:
 
    /// @name Damage
    /// @{
+   S32 mTeam;//dark
+   bool mForceField;
+   S32 mSensorNum;
+   S32 mIconVisDis;
+   LinearColorF mIconColor;
    F32  mDamage;
    F32  mRepairRate;
+   F32 BatteryRate;
    F32  mRepairReserve;
+   F32	mBatteryReserve;
    DamageState mDamageState;
    TSThread *mDamageThread;
    TSThread *mHulkThread;
@@ -1174,6 +1184,7 @@ public:
       SkinMask        = Parent::NextFreeMask << 4,
       MeshHiddenMask  = Parent::NextFreeMask << 5,
       SoundMaskN      = Parent::NextFreeMask << 6,       ///< Extends + MaxSoundThreads bits
+      SensorMask = Parent::NextFreeMask << 7,
       ThreadMaskN     = SoundMaskN  << MaxSoundThreads,  ///< Extends + MaxScriptThreads bits
       ImageMaskN      = ThreadMaskN << MaxScriptThreads, ///< Extends + MaxMountedImage bits
       NextFreeMask    = ImageMaskN  << MaxMountedImages
@@ -1212,6 +1223,8 @@ public:
    void setSkinName(const char*);
    const char* getSkinName();
    /// @}
+   void setShapeIcon(const char*);//dark
+   const char* getShapeIcon();//dark
 
    /// @name Mesh Visibility
    /// @{
@@ -1275,7 +1288,7 @@ public:
    ///
    /// @param  rate  Repair rate in units/second.
    void setRepairRate(F32 rate) { mRepairRate = rate; }
-
+   void setBatteryRate(F32 rate) { BatteryRate = rate; }
    /// Returns damage amount.
    F32  getDamageLevel()  { return mDamage; }
 
@@ -1297,7 +1310,7 @@ public:
    /// Removes damage to an object
    /// @param   amount   Amount to repair object by
    void applyRepair(F32 amount);
-
+   void applyBattery(F32 amount);
    /// Sets the direction from which the damage is coming
    /// @param   vec   Vector indicating the direction of the damage
    void setDamageDir(const VectorF& vec)  { damageDir = vec; }
@@ -1305,20 +1318,21 @@ public:
    /// Sets the level of energy for this object
    /// @param   energy   Level of energy to assign to this object
    virtual void setEnergyLevel(F32 energy);
-
+   virtual void setBatteryLevel(F32 energy);
    /// Sets the rate at which the energy replentishes itself
    /// @param   rate   Rate at which energy restores
    void setRechargeRate(F32 rate) { mRechargeRate = rate; }
+   void setBattery(F32 size) { mBattery = size; }
 
    /// Returns the amount of energy in the object
    F32  getEnergyLevel();
-
+   F32  getBatteryLevel();
    /// Returns the percentage of energy, 0.0 - 1.0
    F32  getEnergyValue();
-
+   F32 getBatteryValue();
    /// Returns the recharge rate
    F32  getRechargeRate() { return mRechargeRate; }
-
+   F32  getBattery() { return mBattery; }
    /// Makes the shape explode.
    virtual void blowUp();
 
@@ -1867,6 +1881,21 @@ public:
    void setTransform(const MatrixF & mat) override;
    F32 getMass() const override { return mMass; }
 
+   virtual S32 getTeam() { return mTeam; }//dark
+   void setTeam(S32 newt) { mTeam = newt; setMaskBits(NameMask); }//
+
+   virtual S32 isForceField() { return mForceField; }//dark
+   void setForceField(S32 newt) { mForceField = newt; setMaskBits(NameMask); }
+
+   virtual S32 getSensor() { return mSensorNum; }//dark
+   void setSensor(S32 newt) { mSensorNum = newt; setMaskBits(SensorMask); }//dark
+
+   virtual S32 getIconVisDis() { return mIconVisDis; }//dark
+   void setIconVisDis(S32 newt) { mIconVisDis = newt; setMaskBits(SensorMask); }//dark
+
+   virtual LinearColorF getIconColor() { return mIconColor; }//dark
+   void setIconColor(LinearColorF newt) { mIconColor = newt; setMaskBits(SensorMask); }//dark
+
    /// @name Network
    /// @{
 
@@ -1967,6 +1996,10 @@ inline WaterObject* ShapeBase::getCurrentWaterObject()
       return mShapeBaseMount->getCurrentWaterObject();
    
    return mCurrentWaterObject;
+}
+
+inline const char* ShapeBase::getShapeIcon() {//dark
+   return mShapeIconHandle.getString();//dark
 }
 
 #endif  // _H_SHAPEBASE_

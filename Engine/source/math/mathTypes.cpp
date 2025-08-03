@@ -1287,3 +1287,19 @@ DefineEngineFunction(mDivS32, const char *, (S32 v1, S32 v2), , "Divide 2 large 
    return ret;
 }
 //------------------------------------------------------------------------------
+DefineEngineFunction(createOrientFromDir, const char*, (VectorF vec), , "Returns orientation from a vector input")
+{
+   MatrixF mat = MathUtils::createOrientFromDir(vec);
+   AngAxisF aa(mat);
+   char* ret = Con::getReturnBuffer(256);
+   dSprintf(ret, 255, "%g %g %g %g", aa.axis.x, aa.axis.y, aa.axis.z, aa.angle);
+   return ret;
+}
+DefineEngineFunction(MatrixCreateFromDir, const char*, (VectorF vec, Point3F pos), , "does something with vector and postion")
+{
+   MatrixF mat = MathUtils::createOrientFromDir(vec);
+   AngAxisF aa(mat);
+   char* ret = Con::getReturnBuffer(256);
+   dSprintf(ret, 255, "%g %g %g %g %g %g %g", pos.x, pos.y, pos.z, aa.axis.x, aa.axis.y, aa.axis.z, aa.angle);
+   return ret;
+}

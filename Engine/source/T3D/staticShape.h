@@ -99,6 +99,7 @@ public:
    bool isPowered() { return(mPowered); }
 
    static void initPersistFields();
+   void inspectPostApply() override;
    void updatePhysics();
 };
 
