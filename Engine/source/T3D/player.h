@@ -396,6 +396,8 @@ struct PlayerData: public ShapeBaseData {
    DECLARE_CALLBACK( void, animationDone, ( Player* obj, const char* animName) );
    DECLARE_CALLBACK( void, onEnterMissionArea, ( Player* obj ) );
    DECLARE_CALLBACK( void, onLeaveMissionArea, ( Player* obj ) );
+   DECLARE_CALLBACK(void, onEnterKillArea, (Player* obj));
+   DECLARE_CALLBACK(void, onLeaveKillArea, (Player* obj));
    /// @}
 };
 
@@ -535,6 +537,7 @@ protected:
    /// @}
 
    bool mInMissionArea;       ///< Are we in the mission area?
+   bool mInKillArea;       ///< Are we in the mission area?
    //
    S32 mRecoverTicks;         ///< same as recoverTicks in the player datablock
    U32 mReversePending;

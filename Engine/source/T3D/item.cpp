@@ -57,7 +57,7 @@ const U32 sClientCollisionMask = (TerrainObjectType     |
 
 const U32 sServerCollisionMask = (sClientCollisionMask);
 
-const S32 Item::csmAtRestTimer = 64;
+const S32 Item::csmAtRestTimer = 4096;
 
 //----------------------------------------------------------------------------
 

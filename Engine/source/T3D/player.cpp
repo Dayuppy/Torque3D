@@ -297,6 +297,16 @@ IMPLEMENT_CALLBACK( PlayerData, onLeaveMissionArea, void, ( Player* obj ), ( obj
    "@param obj The Player object\n"
    "@see MissionArea\n" );
 
+IMPLEMENT_CALLBACK(PlayerData, onEnterKillArea, void, (Player* obj), (obj),
+   "@brief Called when the player enters the mission area.\n\n"
+   "@param obj The Player object\n"
+   "@see MissionArea\n");
+
+IMPLEMENT_CALLBACK(PlayerData, onLeaveKillArea, void, (Player* obj), (obj),
+   "@brief Called when the player hits death planes.\n"
+   "@param obj The Player object\n"
+   "@see MissionArea\n");
+
 PlayerData::PlayerData()
 {
    sHealth = 100.0f;
@@ -2179,10 +2189,15 @@ void Player::processTick(const Move* move)
       if (lvl)
       {
          const Point3F& pos = getPosition();
-         if (pos.z < lvl->getMinKillZ() || pos.z > lvl->getMaxKillZ())
+         if ((pos.z < lvl->getMinKillZ() || pos.z > lvl->getMaxKillZ()) && !mInKillArea)
          {
-            // instant‐kill
-            this->applyDamage(9001.0f);
+            mInKillArea = true;
+            mDataBlock->onEnterKillArea_callback(this);
+         }
+         else if ((pos.z >= lvl->getMinKillZ() && pos.z <= lvl->getMaxKillZ()) && mInKillArea)
+         {
+            mInKillArea = false;
+            mDataBlock->onLeaveKillArea_callback(this);
          }
       }
 

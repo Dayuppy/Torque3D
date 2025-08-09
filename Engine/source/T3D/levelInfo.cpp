@@ -235,9 +235,6 @@ U32 LevelInfo::packUpdate(NetConnection *conn, U32 mask, BitStream *stream)
 
    PACK_ASSET(conn, AccuTexture);
 
-   stream->write(mMinKillZ);
-   stream->write(mMaxKillZ);
-
    return retMask;
 }
 
@@ -288,8 +285,6 @@ void LevelInfo::unpackUpdate(NetConnection *conn, BitStream *stream)
    UNPACK_ASSET(conn, AccuTexture);
    setLevelAccuTexture(getAccuTexture());
 
-   stream->read(&mMinKillZ);
-   stream->read(&mMaxKillZ);
 }
 
 //-----------------------------------------------------------------------------

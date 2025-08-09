@@ -1439,3 +1439,93 @@ bool Explosion::explode()
    return true;
 }
 
+
+
+
+IMPLEMENT_CO_CLIENTEVENT_V1(ExplosionNetEvent);
+
+ExplosionNetEvent::ExplosionNetEvent()
+{
+   pos = Point3F(0, 0, 0);
+   normal = Point3F(0, 0, 1);
+   objectType = 0;
+   dataBlock = NULL;
+}
+
+ExplosionNetEvent::~ExplosionNetEvent()
+{
+}
+
+
+void ExplosionNetEvent::pack(NetConnection* conn, BitStream* bstream)
+{
+   mathWrite(*bstream, pos);
+   mathWrite(*bstream, normal);
+   bstream->write(objectType);
+   bstream->writeRangedU32(dataBlock->getId(), DataBlockObjectIdFirst, DataBlockObjectIdLast);
+}
+
+void ExplosionNetEvent::write(NetConnection* conn, BitStream* bstream)
+{
+   pack(conn, bstream);
+}
+
+void ExplosionNetEvent::unpack(NetConnection* conn, BitStream* bstream)
+{
+   mathRead(*bstream, &pos);
+   mathRead(*bstream, &normal);
+   bstream->read(&objectType);
+   U32 dataBlockID = bstream->readRangedU32(DataBlockObjectIdFirst, DataBlockObjectIdLast);
+   if (Sim::findObject(dataBlockID, dataBlock) == false)
+   {
+      Con::errorf(ConsoleLogEntry::General, "ExplosionNetEvent: Invalid packet, bad datablockId(ExplosionData): 0x%x", dataBlockID);
+   }
+}
+
+
+void ExplosionNetEvent::process(NetConnection* conn)
+{
+   Explosion* pExplosion = NULL;
+   pExplosion = new Explosion;
+   pExplosion->onNewDataBlock(dataBlock, false);
+
+   if (pExplosion)
+   {
+      MatrixF xform(true);
+      xform.setPosition(pos);
+      pExplosion->setTransform(xform);
+      pExplosion->setInitialState(pos, normal);
+      pExplosion->setCollideType(objectType);
+      if (pExplosion->registerObject() == false)
+      {
+         Con::errorf(ConsoleLogEntry::General, "ExplosionNetEvent::explode: couldn't register explosion");
+         delete pExplosion;
+         pExplosion = NULL;
+      }
+   }
+}
+
+
+DefineEngineFunction(spawnExplosion, void, (Point3F pos, Point3F normal, U32 objectType, const char* db), ,
+   "@Render paths for x amount of time.\n\n") {
+   ExplosionData* dataBlock;
+   dataBlock = static_cast<ExplosionData*>(Sim::findObject(db));
+
+   if (!dataBlock) {
+      Con::errorf("spawnExplosion: datablock name %s not found", dataBlock);
+   }
+
+   SimGroup* pClientGroup = Sim::getClientGroup();
+   for (SimGroup::iterator itr = pClientGroup->begin(); itr != pClientGroup->end(); itr++)
+   {
+      NetConnection* nc = static_cast<NetConnection*>(*itr);
+
+      ExplosionNetEvent* pEvent = new ExplosionNetEvent;
+      pEvent->pos = pos;
+      pEvent->normal = normal;
+      pEvent->objectType = objectType;
+      pEvent->dataBlock = dataBlock;
+
+      nc->postNetEvent(pEvent);
+   }
+}

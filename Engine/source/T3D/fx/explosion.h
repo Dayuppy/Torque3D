@@ -217,3 +217,36 @@ public:
 
 #endif // _H_EXPLOSION
 
+/**
+Explosion net event class
+Spawns explosion and sends it to all clients (not possible in default TGE/TSE
+Based 99% on resource by Alex "Delerium" Scarborough
+http://www.garagegames.com/index.php?sec=mg&mod=resource&page=view&qid=8135
+*/
+
+#ifndef _EXPLOSIONNETEVENT_H_
+#define _EXPLOSIONNETEVENT_H_
+
+class ExplosionNetEvent : public NetEvent
+{
+   typedef NetEvent Parent;
+
+public:
+   Point3F pos;
+   Point3F normal;
+   U32 objectType;
+   ExplosionData* dataBlock;
+
+   ExplosionNetEvent();
+   ~ExplosionNetEvent();
+
+   virtual void pack(NetConnection* conn, BitStream* bstream);
+   virtual void write(NetConnection* conn, BitStream* bstream);
+   virtual void unpack(NetConnection* conn, BitStream* bstream);
+   virtual void process(NetConnection* conn);
+
+   DECLARE_CONOBJECT(ExplosionNetEvent);
+};
+
+#endif //_EXPLOSIONNETEVENT_H_
+
